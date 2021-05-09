@@ -10,7 +10,7 @@ from collections import deque
 state_size = 115
 action_size = 18
 
-load_model = False=
+load_model = False
 train_mode = True
 
 batch_size = 128
