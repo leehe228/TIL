@@ -33,6 +33,8 @@ epsilon_min = 0.1
 date_time = datetime.datetime.now().strftime("%Y%m%d-%H-%M-%S")
 
 # Model 클래스 -> 네트워크 정의 및 손실함수 설정, 네트워크 최적화 알고리즘 결정
+
+
 class Model():
     def __init__(self, model_name):
         self.input = tf.placeholder(shape=[None, state_size], dtype=tf.float32)
@@ -86,7 +88,7 @@ class DQNAgent():
         else:
             # 네트워크 연산에 따라 액션 결정
             predict = self.sess.run(self.model.predict,
-                                     feed_dict={self.model.input: [state]})
+                                    feed_dict={self.model.input: [state]})
             return np.asscalar(predict1)
 
     # 리플레이 메모리에 데이터 추가 (observation, reward, done, info)
@@ -190,7 +192,7 @@ if __name__ == "__main__":
 		while not done:
 			step += 1
 			action = agent.get_action(observation)
-			
+
 			next_observation, reward, done, info = env.step(action)
 
 			if train_mode:
@@ -203,7 +205,8 @@ if __name__ == "__main__":
 			observation = next_observation
 
 			if episode > start_train_episode and train_mode:
-				loss = agent.train_model(agent.model, agent.target_model, agent.memory, done)
+				loss = agent.train_model(
+				    agent.model, agent.target_model, agent.memory, done)
 				losses.append(loss)
 
 				if step % (target_update_step) == 0:
@@ -211,19 +214,19 @@ if __name__ == "__main__":
 
 		rewards.append(episode_rewards)
 
-		# 게임 진행 상황 출력 및 텐서 보드에 보상과 손실함수값 기록 
+		# 게임 진행 상황 출력 및 텐서 보드에 보상과 손실함수값 기록
 		if episode % print_interval == 0 and episode != 0:
-            print("step: {} / episode: {} / epsilon: {:.3f}".format(step, episode, agent.epsilon))
-            print("reward: {:.2f} / loss: {:.4f}".format(np.mean(rewards), np.mean(losses)))
-            print('------------------------------------------------------------')
-            
-            agent.Write_Summray(np.mean(rewards), np.mean(losses), episode)
-            rewards = []
-            losses = []
+			print("step: {} / episode: {} / epsilon: {:.3f}".format(step, episode, agent.epsilon))
+			print(
+			    "reward: {:.2f} / loss: {:.4f}".format(np.mean(rewards), np.mean(losses)))
+			print('------------------------------------------------------------')
+			agent.Write_Summray(np.mean(rewards), np.mean(losses), episode)
+			rewards = []
+			losses = []
 
-        # 네트워크 모델 저장 
+        # 네트워크 모델 저장
 		if episode % save_interval == 0 and episode != 0:
-            agent.save_model()
-            print("Save Model {}".format(episode))
+			agent.save_model()
+			print("Save Model {}".format(episode))
 
 	exit(0)
