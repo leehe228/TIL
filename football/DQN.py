@@ -10,7 +10,7 @@ from collections import deque
 state_size = 115
 action_size = 18
 
-load_model = False
+load_model = False=
 train_mode = True
 
 batch_size = 128
@@ -31,6 +31,9 @@ epsilon_init = 1.0
 epsilon_min = 0.1
 
 date_time = datetime.datetime.now().strftime("%Y%m%d-%H-%M-%S")
+
+save_path = "./saved_models/"+ date_time + "_DQN"
+load_path = "./saved_models/model/model"
 
 # Model 클래스 -> 네트워크 정의 및 손실함수 설정, 네트워크 최적화 알고리즘 결정
 
