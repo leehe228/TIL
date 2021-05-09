@@ -45,11 +45,11 @@ class Model():
             self.fc2 = tf.layers.dense(self.fc1, 512, activation=tf.nn.relu)
             self.fc3 = tf.layers.dense(self.fc2, 512, activation=tf.nn.relu)
             self.Q_Out = tf.layers.dense(
-                self.fc3, action_size_s, activation=None)
+                self.fc3, action_size, activation=None)
         self.predict = tf.argmax(self.Q_Out, 1)
 
         self.target_Q = tf.placeholder(
-            shape=[None, action_size_s], dtype=tf.float32)
+            shape=[None, action_size], dtype=tf.float32)
 
         # 손실함수값 계산 및 네트워크 학습 수행
         self.loss = tf.losses.mean_squared_error(self.target_Q, self.Q_Out)
