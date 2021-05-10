@@ -7,7 +7,7 @@ import time
 import tensorflow as tf
 from collections import deque
 
-state_size = 115
+state_size = [72, 96, 4]
 action_size = 18
 
 load_model = False
@@ -40,26 +40,35 @@ load_path = "./saved_models/model/model"
 
 class Model():
     def __init__(self, model_name):
-        self.input = tf.placeholder(shape=[None, state_size], dtype=tf.float32)
+        self.input = tf.placeholder(shape=[None, state_size[0], state_size[1], 
+                                           state_size[2]], dtype=tf.float32)
+        # 입력을 -1 ~ 1까지 값을 가지도록 정규화
+        self.input_normalize = (self.input - (255.0 / 2)) / (255.0 / 2)
 
-        # 네트워크 구축 -> 완전연결층만을 이용하여 구성
+        # CNN Network 구축 -> 3개의 Convolutional layer와 2개의 Fully connected layer
         with tf.variable_scope(name_or_scope=model_name):
-            self.fc1 = tf.layers.dense(self.input, 512, activation=tf.nn.relu)
-            self.fc2 = tf.layers.dense(self.fc1, 512, activation=tf.nn.relu)
-            self.fc3 = tf.layers.dense(self.fc2, 512, activation=tf.nn.relu)
-            self.Q_Out = tf.layers.dense(
-                self.fc3, action_size, activation=None)
+            self.conv1 = tf.layers.conv2d(inputs=self.input_normalize, filters=32, 
+                                          activation=tf.nn.relu, kernel_size=[8,8], 
+                                          strides=[4,4], padding="SAME")
+            self.conv2 = tf.layers.conv2d(inputs=self.conv1, filters=64, 
+                                          activation=tf.nn.relu, kernel_size=[4,4],
+                                          strides=[2,2],padding="SAME")
+            self.conv3 = tf.layers.conv2d(inputs=self.conv2, filters=64, 
+                                          activation=tf.nn.relu, kernel_size=[3,3],
+                                          strides=[1,1],padding="SAME")
+ 
+            self.flat = tf.layers.flatten(self.conv3)
+
+            self.fc1 = tf.layers.dense(self.flat,512,activation=tf.nn.relu)
+            self.Q_Out = tf.layers.dense(self.fc1, action_size, activation=None)
         self.predict = tf.argmax(self.Q_Out, 1)
 
-        self.target_Q = tf.placeholder(
-            shape=[None, action_size], dtype=tf.float32)
+        self.target_Q = tf.placeholder(shape=[None, action_size], dtype=tf.float32)
 
-        # 손실함수값 계산 및 네트워크 학습 수행
-        self.loss = tf.losses.mean_squared_error(self.target_Q, self.Q_Out)
-        self.UpdateModel = tf.train.AdamOptimizer(
-            learning_rate).minimize(self.loss)
-        self.trainable_var = tf.get_collection(
-            tf.GraphKeys.TRAINABLE_VARIABLES, model_name)
+        # 손실함수 값 계산 및 네트워크 학습 수행 
+        self.loss = tf.losses.huber_loss(self.target_Q, self.Q_Out)
+        self.UpdateModel = tf.train.AdamOptimizer(learning_rate).minimize(self.loss)
+        self.trainable_var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, model_name)
 
 
 # DQNAgent 클래스 -> DQN 알고리즘을 위한 다양한 함수
@@ -83,7 +92,7 @@ class DQNAgent():
             self.Saver.restore(self.sess, load_path)
 
     # Epsilon greedy 기법에 따라 액션 결정
-    def get_action(self, state1):
+    def get_action(self, state):
         if self.epsilon > np.random.rand():
             # 랜덤하게 액션 결정
             random_action = np.random.randint(0, action_size)
@@ -92,7 +101,7 @@ class DQNAgent():
             # 네트워크 연산에 따라 액션 결정
             predict = self.sess.run(self.model.predict,
                                     feed_dict={self.model.input: [state]})
-            return np.asscalar(predict1)
+            return np.asscalar(predict)
 
     # 리플레이 메모리에 데이터 추가 (observation, reward, done, info)
     def append_sample(self, data):
@@ -202,8 +211,8 @@ if __name__ == "__main__":
 				data = [observation, action, reward, next_observation, done]
 				agent.append_sample(data)
 			else:
-				time.sleep(0.02)
-				agent.epsilon = 0.0
+				time.sleep(0.01)
+				agent.epsilon = 0.05
 
 			observation = next_observation
 
