@@ -7,7 +7,7 @@ from collections import deque
 from mlagents.envs import UnityEnvironment
 
 # DDPG를 위한 파라미터 값 세팅
-state_size = 9
+state_size = [72, 96, 4]
 action_size = 3
 
 load_model = False
@@ -40,6 +40,8 @@ save_path = "../saved_models/" + game + "/" + date_time + "_DDPG"
 load_path = "../saved_models/" + game + "/20191115-16-37-43_DDPG/model/model"
 
 # OU_noise 클래스 -> ou noise 정의 및 파라미터 결정
+
+
 class OU_noise:
     def __init__(self):
         self.reset()
@@ -53,49 +55,62 @@ class OU_noise:
         return self.X
 
 # Actor 클래스 -> Actor 클래스를 통해 action을 출력
+
+
 class Actor:
     def __init__(self, name):
         with tf.variable_scope(name):
             self.state = tf.placeholder(tf.float32, [None, state_size])
             self.fc1 = tf.layers.dense(self.state, 128, activation=tf.nn.relu)
             self.fc2 = tf.layers.dense(self.fc1, 128, activation=tf.nn.relu)
-            self.action = tf.layers.dense(self.fc2, action_size, activation=tf.nn.tanh)
+            self.action = tf.layers.dense(
+                self.fc2, action_size, activation=tf.nn.tanh)
 
-        self.trainable_var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, name)
+        self.trainable_var = tf.get_collection(
+            tf.GraphKeys.TRAINABLE_VARIABLES, name)
 
 # Critic 클래스 -> Critic 클래스를 통해 state와 action에 대한 Q-value를 출력
+
+
 class Critic:
     def __init__(self, name):
         with tf.variable_scope(name):
             self.state = tf.placeholder(tf.float32, [None, state_size])
             self.fc1 = tf.layers.dense(self.state, 128, activation=tf.nn.relu)
             self.action = tf.placeholder(tf.float32, [None, action_size])
-            self.concat = tf.concat([self.fc1, self.action],axis=-1)
+            self.concat = tf.concat([self.fc1, self.action], axis=-1)
             self.fc2 = tf.layers.dense(self.concat, 128, activation=tf.nn.relu)
             self.fc3 = tf.layers.dense(self.fc2, 128, activation=tf.nn.relu)
             self.predict_q = tf.layers.dense(self.fc3, 1, activation=None)
 
-        self.trainable_var = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, name)
-    
+        self.trainable_var = tf.get_collection(
+            tf.GraphKeys.TRAINABLE_VARIABLES, name)
+
 # DDPGAgnet 클래스 -> Actor-Critic을 기반으로 학습하는 에이전트 클래스
+
+
 class DDPGAgent:
     def __init__(self):
         self.actor = Actor("actor")
         self.critic = Critic("critic")
         self.target_actor = Actor("target_actor")
         self.target_critic = Critic("target_critic")
-        
-        self.target_q = tf.placeholder(tf.float32, [None, 1])
-        critic_loss = tf.losses.mean_squared_error(self.target_q, self.critic.predict_q)
-        self.train_critic = tf.train.AdamOptimizer(critic_lr).minimize(critic_loss)
 
-        action_grad = tf.gradients(tf.squeeze(self.critic.predict_q), self.critic.action)
-        policy_grad = tf.gradients(self.actor.action, self.actor.trainable_var, action_grad)
+        self.target_q = tf.placeholder(tf.float32, [None, 1])
+        critic_loss = tf.losses.mean_squared_error(
+            self.target_q, self.critic.predict_q)
+        self.train_critic = tf.train.AdamOptimizer(
+            critic_lr).minimize(critic_loss)
+
+        action_grad = tf.gradients(tf.squeeze(
+            self.critic.predict_q), self.critic.action)
+        policy_grad = tf.gradients(
+            self.actor.action, self.actor.trainable_var, action_grad)
         for idx, grads in enumerate(policy_grad):
             policy_grad[idx] = -grads/batch_size
         self.train_actor = tf.train.AdamOptimizer(actor_lr).apply_gradients(
-                                                            zip(policy_grad, self.actor.trainable_var))
-  
+            zip(policy_grad, self.actor.trainable_var))
+
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
 
@@ -108,12 +123,12 @@ class DDPGAgent:
         for idx in range(len(self.actor.trainable_var)):
             self.soft_update_target.append(self.target_actor.trainable_var[idx].assign(
                 ((1 - tau) * self.target_actor.trainable_var[idx].value())
-                             + (tau * self.actor.trainable_var[idx].value())))
+                + (tau * self.actor.trainable_var[idx].value())))
         for idx in range(len(self.critic.trainable_var)):
             self.soft_update_target.append(self.target_critic.trainable_var[idx].assign(
                 ((1 - tau) * self.target_critic.trainable_var[idx].value())
-                            + (tau * self.critic.trainable_var[idx].value())))
-        
+                + (tau * self.critic.trainable_var[idx].value())))
+
         init_update_target = []
         for idx in range(len(self.actor.trainable_var)):
             init_update_target.append(self.target_actor.trainable_var[idx].assign(
@@ -128,7 +143,8 @@ class DDPGAgent:
 
     # Actor model에서 action을 예측하고 noise 설정
     def get_action(self, state):
-        action = self.sess.run(self.actor.action, feed_dict={self.actor.state: state})
+        action = self.sess.run(self.actor.action, feed_dict={
+                               self.actor.state: state})
         noise = self.OU.sample()
         return action + noise if train_mode else action
 
@@ -139,7 +155,7 @@ class DDPGAgent:
     # model 저장
     def save_model(self):
         self.Saver.save(self.sess, save_path + "/model/model")
-    
+
     # replay memory를 통해 모델을 학습
     def train_model(self):
         mini_batch = random.sample(self.memory, batch_size)
@@ -150,22 +166,23 @@ class DDPGAgent:
         dones = np.asarray([sample[4] for sample in mini_batch])
 
         target_actor_actions = self.sess.run(self.target_actor.action,
-                                            feed_dict={self.target_actor.state: next_states})
+                                             feed_dict={self.target_actor.state: next_states})
         target_critic_predict_qs = self.sess.run(self.target_critic.predict_q,
-                                                feed_dict={self.target_critic.state: next_states,
-                                                self.target_critic.action: target_actor_actions})
+                                                 feed_dict={self.target_critic.state: next_states,
+                                                            self.target_critic.action: target_actor_actions})
         target_qs = np.asarray([reward + discount_factor * (1 - done) * target_critic_predict_q
                                 for reward, target_critic_predict_q, done in zip(
-                                                        rewards, target_critic_predict_qs, dones)])
+            rewards, target_critic_predict_qs, dones)])
         self.sess.run(self.train_critic, feed_dict={self.critic.state: states,
                                                     self.critic.action: actions,
                                                     self.target_q: target_qs})
 
-        actions_for_train = self.sess.run(self.actor.action, feed_dict={self.actor.state: states})
+        actions_for_train = self.sess.run(self.actor.action, feed_dict={
+                                          self.actor.state: states})
         self.sess.run(self.train_actor, feed_dict={self.actor.state: states,
                                                    self.critic.state: states,
                                                    self.critic.action: actions_for_train})
-                                                   
+
         self.sess.run(self.soft_update_target)
 
     def Make_Summary(self):
@@ -173,15 +190,17 @@ class DDPGAgent:
         self.summary_success_cnt = tf.placeholder(tf.float32)
         tf.summary.scalar("reward", self.summary_reward)
         tf.summary.scalar("success_cnt", self.summary_success_cnt)
-        Summary = tf.summary.FileWriter(logdir=save_path, graph=self.sess.graph)
+        Summary = tf.summary.FileWriter(
+            logdir=save_path, graph=self.sess.graph)
         Merge = tf.summary.merge_all()
 
         return Summary, Merge
-        
+
     def Write_Summray(self, reward, success_cnt, episode):
         self.Summary.add_summary(self.sess.run(self.Merge, feed_dict={
-                                    self.summary_reward: reward, 
-                                    self.summary_success_cnt: success_cnt}), episode)
+            self.summary_reward: reward,
+            self.summary_success_cnt: success_cnt}), episode)
+
 
 # Main 함수 -> DDPG 에이전트를 드론 환경에서 학습
 if __name__ == '__main__':
@@ -215,14 +234,14 @@ if __name__ == '__main__':
             done = env_info.local_done[0]
 
             episode_rewards += reward
-            
+
             if train_mode:
                 agent.append_sample(state, action, reward, next_state, done)
 
             state = next_state
 
             # train_mode 이고 일정 이상 에피소드가 지나면 학습
-            if episode > start_train_episode and train_mode :
+            if episode > start_train_episode and train_mode:
                 agent.train_model()
 
         success_cnt = success_cnt + 1 if reward == 1 else success_cnt
