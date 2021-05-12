@@ -33,7 +33,7 @@ epsilon_min = 0.1
 date_time = datetime.datetime.now().strftime("%Y%m%d-%H-%M-%S")
 
 save_path = "./saved_models/" + date_time + "_DQN"
-load_path = "./saved_models/model/model"
+load_path = "./saved_models/" + date_time + "_DQN/model/model"
 
 # Model 클래스 -> 네트워크 정의 및 손실함수 설정, 네트워크 최적화 알고리즘 결정
 
@@ -122,8 +122,8 @@ class DQNAgent():
         self.memory2.append((data2[0], data2[1], data2[2], data2[3], data2[4]))
 
     # 네트워크 모델 저장
-    def save_model(self, episode):
-        self.Saver.save(self.sess, save_path + "/model/model" + str(episode))
+    def save_model(self):
+        self.Saver.save(self.sess, save_path + "/model/model")
 
     # 학습 수행
     def train_model(self, model, target_model, memory, done):
@@ -275,7 +275,7 @@ if __name__ == "__main__":
 
         # 네트워크 모델 저장
         if episode % save_interval == 0 and episode != 0:
-            agent.save_model(episode)
+            agent.save_model()
             print("Save Model {}".format(episode))
 
     exit(0)
