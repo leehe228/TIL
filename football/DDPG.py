@@ -17,8 +17,8 @@ train_mode = True
 
 render_mode = False
 
-batch_size = 4
-mem_maxlen = 1000
+batch_size = 512
+mem_maxlen = 100000
 discount_factor = 0.99
 
 # actor-critic
@@ -30,32 +30,21 @@ mu = 0
 theta = 0.001
 sigma = 0.002
 
-start_train_episode = 0
-run_episode = 500
-test_episode = 10
+epsilon_init = 1.0
+epsilon_min = 0.1
+
+start_train_episode = 100
+run_episode = 3000
+test_episode = 100
 
 print_interval = 1
-save_interval = 2
+save_interval = 300
 
 date_time = datetime.datetime.now().strftime("%Y%m%d-%H-%M-%S")
 
-save_path = "./saved_models/" + date_time + "_DDPG"
-load_path = ""
+save_path = "./saved_models/DDPG/" + date_time
+load_path = "./saved_models/DDPG/" + date_time + "/model0/model"
 
-# OU_noise 클래스 -> ou noise 정의 및 파라미터 결정
-class OU_noise:
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.X = np.ones(action_size) * mu
-
-    def sample(self):
-        dx = theta * (mu - self.X) + sigma * np.random.randn(len(self.X))
-        self.X += dx
-        return self.X
-
-# Actor 클래스 -> Actor 클래스를 통해 action을 출력
 class Actor:
     def __init__(self, model_name):
         self.state = tf.placeholder(shape=[None, state_size[0], state_size[1],
@@ -74,13 +63,16 @@ class Actor:
 
             self.flat = tf.layers.flatten(self.conv3)
 
-            self.fc1 = tf.layers.dense(self.flat, 512, activation=tf.nn.relu)
-            self.action = tf.layers.dense(self.fc1, action_size, activation=tf.tanh)
+            self.fc1 = tf.layers.dense(self.flat, 128, activation=tf.nn.relu)
+            self.fc2 = tf.layers.dense(self.fc1, 128, activation=tf.nn.relu)
+            self.action = tf.layers.dense(self.fc2, action_size, activation=tf.tanh)
 
         self.trainable_var = tf.get_collection(
             tf.GraphKeys.TRAINABLE_VARIABLES, model_name)
 
 # Critic 클래스 -> Critic 클래스를 통해 state와 action에 대한 Q-value를 출력
+
+
 class Critic:
     def __init__(self, model_name):
         self.state = tf.placeholder(shape=[None, state_size[0], state_size[1],
@@ -99,7 +91,7 @@ class Critic:
 
             self.flat = tf.layers.flatten(self.conv3)
 
-            self.fc1 = tf.layers.dense(self.flat, 32, activation=tf.nn.relu)
+            self.fc1 = tf.layers.dense(self.flat, 128, activation=tf.nn.relu)
             self.action = tf.placeholder(tf.float32, [None, action_size])
             self.concat = tf.concat([self.fc1, self.action], axis=-1)
             self.fc2 = tf.layers.dense(self.concat, 128, activation=tf.nn.relu)
@@ -110,6 +102,8 @@ class Critic:
             tf.GraphKeys.TRAINABLE_VARIABLES, model_name)
 
 # DDPGAgnet 클래스 -> Actor-Critic을 기반으로 학습하는 에이전트 클래스
+
+
 class DDPGAgent:
     def __init__(self):
         self.actor = Actor("actor")
@@ -137,8 +131,9 @@ class DDPGAgent:
 
         self.Saver = tf.train.Saver()
         self.Summary, self.Merge = self.Make_Summary()
-        self.OU = OU_noise()
         self.memory = deque(maxlen=mem_maxlen)
+
+        self.epsilon = epsilon_init
 
         self.soft_update_target = []
         for idx in range(len(self.actor.trainable_var)):
@@ -164,10 +159,17 @@ class DDPGAgent:
 
     # Actor model에서 action을 예측하고 noise 설정
     def get_action(self, state):
-        action = self.sess.run(self.actor.action, feed_dict={
-                               self.actor.state: [state]})
-        noise = self.OU.sample()
-        return np.argmax(action + noise if train_mode else action)
+        if self.epsilon > np.random.rand():
+            action = env.action_space.sample()
+            actions = []
+            for a in action:
+                temp = [0.0 for k in range(action_size)]
+                temp[a] = 1.0
+                actions.append(temp)
+        else:
+            actions = self.sess.run(self.actor.action, feed_dict={self.actor.state: [state]})
+
+        return actions
 
     # replay memory에 입력
     def append_sample(self, state, action, reward, next_state, done):
@@ -175,10 +177,14 @@ class DDPGAgent:
 
     # model 저장
     def save_model(self, episode):
-        self.Saver.save(self.sess, save_path + "/model/model" + str(episode))
+        self.Saver.save(self.sess, save_path + "/model" + str(episode) + "/model")
 
     # replay memory를 통해 모델을 학습
-    def train_model(self):
+    def train_model(self, step):
+        if step % 100 == 0:
+            if self.epsilon > epsilon_min:
+                self.epsilon -= 0.01 / (run_episode - start_train_episode)
+
         mini_batch = random.sample(self.memory, batch_size)
         states = np.asarray([sample[0] for sample in mini_batch])
         actions = np.asarray([sample[1] for sample in mini_batch])
@@ -192,11 +198,11 @@ class DDPGAgent:
                                                  feed_dict={self.target_critic.state: next_states,
                                                             self.target_critic.action: target_actor_actions})
         target_qs = np.asarray([reward + discount_factor * (1 - done) * target_critic_predict_q
-                                for reward, target_critic_predict_q, done in zip(
-            rewards, target_critic_predict_qs, dones)])
+                                for reward, target_critic_predict_q, done in zip(rewards, target_critic_predict_qs, dones)])
+
         self.sess.run(self.train_critic, feed_dict={self.critic.state: states,
-                                                    self.critic.action: actions,
-                                                    self.target_q: target_qs})
+                                                        self.critic.action: actions,
+                                                        self.target_q: target_qs})
 
         actions_for_train = self.sess.run(self.actor.action, feed_dict={
                                           self.actor.state: states})
@@ -207,23 +213,23 @@ class DDPGAgent:
         self.sess.run(self.soft_update_target)
 
     def Make_Summary(self):
+        self.summary_rewards = tf.placeholder(tf.float32)
         self.summary_reward1 = tf.placeholder(tf.float32)
         self.summary_reward2 = tf.placeholder(tf.float32)
-        self.summary_success_cnt = tf.placeholder(tf.float32)
+        tf.summary.scalar("mean rewards", self.summary_rewards)
         tf.summary.scalar("reward1", self.summary_reward1)
         tf.summary.scalar("reward2", self.summary_reward2)
-        tf.summary.scalar("success_cnt", self.summary_success_cnt)
         Summary = tf.summary.FileWriter(
             logdir=save_path, graph=self.sess.graph)
         Merge = tf.summary.merge_all()
 
         return Summary, Merge
 
-    def Write_Summray(self, reward1, reward2, success_cnt,  episode):
+    def Write_Summray(self, rewards, reward1, reward2, episode):
         self.Summary.add_summary(self.sess.run(self.Merge, feed_dict={
+            self.summary_rewards: rewards,
             self.summary_reward1: reward1,
-            self.summary_reward2: reward2,
-            self.summary_success_cnt: success_cnt}), episode)
+            self.summary_reward2: reward2}), episode)
 
 
 # Main 함수
@@ -237,8 +243,7 @@ if __name__ == '__main__':
 
     # DDPGAgnet 선언
     agent = DDPGAgent()
-    rewards = deque(maxlen=print_interval)
-    success_cnt = 0
+    # rewards = deque(maxlen=print_interval)
     step = 0
 
     for episode in range(run_episode + test_episode):
@@ -259,11 +264,12 @@ if __name__ == '__main__':
 
         while not done:
             step += 1
-            print(f"step : {step} | reward1 : {round(episode_rewards1, 4)} | reward2 : {round(episode_rewards2, 4)}", end='\r')
+            print("step: {} | episode: {} | reward1: {:.3f} | reward2: {:.3f} | eps: {:.4f}".format(step, episode, episode_rewards1, episode_rewards2, agent.epsilon), end='\r')
 
             action1 = agent.get_action(state1)
             action2 = agent.get_action(state2)
-            no, reward, done, info = env.step([action1, action2])
+
+            no, reward, done, info = env.step([np.argmax(action1), np.argmax(action2)])
 
             next_state1 = no[0]
             next_state2 = no[1]
@@ -273,30 +279,29 @@ if __name__ == '__main__':
             episode_rewards2 += reward[1]
 
             if train_mode:
-                agent.append_sample(state1, action1, reward[0], next_state1, done)
-                agent.append_sample(state2, action2, reward[1], next_state2, done)
+                agent.append_sample(state1, action1[0], reward[0], next_state1, done)
+                agent.append_sample(state2, action2[0], reward[1], next_state2, done)
+            else:
+                agent.epsilon = 0.05
 
             state1 = next_state1
             state2 = next_state2
 
             # train_mode 이고 일정 이상 에피소드가 지나면 학습
-            if episode > start_train_episode and train_mode:
-                agent.train_model()
+            if episode > start_train_episode and train_mode and step % 25 == 0:
+                agent.train_model(step)
 
-        success_cnt = success_cnt + 1 if reward == 2.0 else success_cnt
-        rewards.append(episode_rewards1)
-        rewards.append(episode_rewards2)
+        # rewards.append(episode_rewards1)
+        # rewards.append(episode_rewards2)
 
         # 일정 이상의 episode를 진행 시 log 출력
         if episode % print_interval == 0 and episode != 0:
-            print("step: {} / episode: {} / reward1: {:.3f} / reward2: {:.3f} / success_cnt: {}".format
-                  (step, episode, np.mean(episode_rewards1), np.mean(episode_rewards2), success_cnt))
-            agent.Write_Summray(np.mean(rewards), np.mean(episode_rewards1), np.mean(episode_rewards2), success_cnt, episode)
-            success_cnt = 0
+            print("step: {} | episode: {} | reward1: {:.3f} | reward2: {:.3f} | eps: {:.4f}".format(step, episode, episode_rewards1, episode_rewards2, agent.epsilon))
+            agent.Write_Summray(((episode_rewards1 + episode_rewards2) / 2.0), episode_rewards1, episode_rewards2, episode)
 
         # 일정 이상의 episode를 진행 시 현재 모델 저장
         if train_mode and episode % save_interval == 0 and episode != 0:
-            print("model saved")
+            print("model saved at episode", episode)
             agent.save_model(episode)
 
     env.close()

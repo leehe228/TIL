@@ -18,7 +18,11 @@ while not done:
 	for i in range(11):
 		actions.append(random.randrange(0, 18) + 1)"""
 	observation, reward, done, info = env.step(actions)
-	print(np.where(observation[0, :, :, 3] == 255)[0][0])
-
+	s1 = np.where(observation[0] == 255)[0]
+	s2 = np.where(observation[0] == 255)[1]
+	state = np.concatenate((s1, s2), axis=None)
+	print(state)
 	
+	
+
 	
