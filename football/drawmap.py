@@ -1,6 +1,12 @@
 import gfootball.env as football_env
 import random
 import os
+import numpy as np
+import pygame
+
+pygame.init()
+
+xnum = 8
 
 env = football_env.create_environment(
 		env_name='11_vs_11_stochastic',
@@ -12,73 +18,39 @@ env.reset()
 done = False
 rewards1 = 0.0
 rewards2 = 0.0
+screen = pygame.display.set_mode([72*xnum, 96*xnum])
+step = 0
+myFont = pygame.font.Font(None, 30)
 
 while not done:
+	step += 1
 	actions = env.action_space.sample()
-	"""actions = []
-	for i in range(11):
-		actions.append(random.randrange(0, 18) + 1)"""
 	observation, reward, done, info = env.step(actions)
 
 	rewards1 = rewards1 + reward[0]
 	rewards2 = rewards2 + reward[1]
-	home_players = []
-	side_players = []
-	ball = None
-	active_player = None
 
-	for i in range(72):
-		for j in range(96):
-			if observation[0, i, j, 0] != 0.0:
-				home_players.append([i, j])
-	for i in range(72):
-		for j in range(96):
-			if observation[0, i, j, 1] != 0.0:
-				side_players.append([i, j])
-	for i in range(72):
-		for j in range(96):
-			if observation[0, i, j, 2] != 0.0:
-				ball = [i, j]
-
-	for i in range(72):
-		for j in range(96):
-			if observation[0, i, j, 3] != 0.0:
-				active_player = [i, j]
-
-	m = [[0 for i in range(96)] for j in range(72)]
-	img = [[0 for i in range(96)] for j in range(72)]
-
-	for t in home_players:
-		m[t[0]][t[1]] = 1
-		img[t[0]][t[1]] = 255
-
-	for t in side_players:
-		m[t[0]][t[1]] = 2
-		img[t[0]][t[1]] = 255
-
-	m[ball[0]][ball[1]] = 3
-	img[ball[0]][ball[1]] = 255
-
-	m[active_player[0]][active_player[1]] = 4
-	img[active_player[0]][active_player[1]] = 255
+	p1 = np.where(observation[0, :, :, 0] == 255.0)
+	p2 = np.where(observation[0, :, :, 1] == 255.0)
+	ball = np.where(observation[0, :, :, 2] == 255.0)
+	active1 = np.where(observation[0, :, :, 3] == 255.0)
+	active2 = np.where(observation[1, :, :, 3] == 255.0)
 	
-	os.system('clear')
-	for k in range(72):
-		for j in range(96):
-			
-			if (k == 0) or (k == 71) or (j == 0) or (j == 95):
-				print('■ ', end='')
-			elif m[k][j] == 0:
-				print('  ', end='')
-			elif m[k][j] == 1:
-				print('● ', end='')
-			elif m[k][j] == 2:
-				print('○ ', end='')
-			elif m[k][j] == 3:
-				print('★ ', end='')
-			elif m[k][j] == 4:
-				print('▲ ', end='')
-			
-		print()
-	print(f"r1 : {rewards1} | r2 : {rewards2} | info : {info}")
+	screen.fill((255, 255, 255))
+	z = 1
+	for i1, j1, i2, j2 in zip(p1[0], p1[1], p2[0], p2[1]):
+		numberling1 = myFont.render(str(z), True, (100, 100, 255))
+		numberling2 = myFont.render(str(z), True, (255, 100, 100))
+		# pygame.draw.circle(screen, (100, 100, 255), [i1*xnum, j1*xnum], 2, 2)
+		# pygame.draw.circle(screen, (255, 100, 100), [i2*xnum, j2*xnum], 2, 2)
+		screen.blit(numberling1, [i1*xnum, j1*xnum])
+		screen.blit(numberling2, [i2*xnum, j2*xnum])
+		z += 1
+
+	pygame.draw.circle(screen, (0, 0, 0), [ball[0][0]*xnum, ball[1][0]*xnum], 4, 4)
+	pygame.draw.circle(screen, (0, 0, 255), [active1[0][0]*xnum, active1[1][0]*xnum], 4, 4)
+	pygame.draw.circle(screen, (255, 0, 0), [active2[0][0]*xnum, active2[1][0]*xnum], 4, 4)
+
+	pygame.display.flip()
+	print("step : {} | r1 : {:.4f} | r2 : {:.4f}".format(step, rewards1, rewards2), end='\r')
 	
