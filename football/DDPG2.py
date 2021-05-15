@@ -38,8 +38,6 @@ save_interval = 100
 
 date_time = datetime.datetime.now().strftime("%Y%m%d-%H-%M-%S")
 
-game = "Drone"
-env_name = "../env/" + game + "/Windows/" + game
 
 save_path = "./saved_models/DDPG/" + date_time
 load_path = "./saved_models/DDPG/" + date_time + "/model0/model"
