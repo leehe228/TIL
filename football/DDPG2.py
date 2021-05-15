@@ -278,7 +278,7 @@ class Agent:
         self.Summary.add_summary(self.sess_moving.run(self.Merge, feed_dict={
             self.summary_rewards: rewards}), episode)
 
-# Main 함수 -> DDPG 에이전트를 드론 환경에서 학습
+
 if __name__ == '__main__':
     env = football_env.create_environment(
         env_name=academy_scenario,
@@ -292,7 +292,6 @@ if __name__ == '__main__':
 
     step = 0
 
-    # 각 에피소드를 거치며 replay memory에 저장
     for episode in range(run_episode + test_episode):
         if episode == run_episode:
             train_mode = False
@@ -333,7 +332,6 @@ if __name__ == '__main__':
             now_active1 = (np.where(next_obs[0, :, :, 3] == 255)[0][0], np.where(next_obs[0, :, :, 3] == 255)[1][0])
             now_active2 = (np.where(next_obs[1, :, :, 3] == 255)[0][0], np.where(next_obs[1, :, :, 3] == 255)[1][0])
 
-            # 가만히 있으면 
             if active1 == now_active1:
                 reward1 -= 0.1
             elif active1[0] > 72 // 2:
