@@ -357,16 +357,13 @@ if __name__ == '__main__':
             state1 = next_state1
             state2 = next_state2
             active1 = now_active1
-            active2 = now_active2
-
-            # train_mode 이고 일정 이상 에피소드가 지나면 학습
+   
             if episode > start_train_episode and train_mode and step % 25 == 0:
                 agent1.train_model_moving(step)
                 agent1.train_model_skill(step)
                 agent2.train_model_moving(step)
                 agent2.train_model_skill(step)
 
-        # 일정 이상의 episode를 진행 시 log 출력
         if episode % print_interval == 0 and episode != 0:
             print("step: {} | episode: {} | reward1: {:.3f} | reward2: {:.3f}".format(step, episode, episode_rewards1, episode_rewards2))
             agent1.Write_Summray(episode_rewards1, episode)
