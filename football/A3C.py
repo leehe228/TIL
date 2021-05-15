@@ -6,8 +6,10 @@ import random
 import datetime
 from collections import deque
 
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import Dense, LSTM, Dropout
 
-state_size = 0
+state_size = 48
 moving_action_size = 8
 skill_action_size = 11
 
@@ -42,25 +44,56 @@ save_path = "./saved_models/DDPG/" + date_time
 load_path = "./saved_models/DDPG/" + date_time + "/model0/model"
 
 
-class Actor:
-    def __init__(self, name):
+class Actor_Moving:
+    def __init__(self):
         pass
 
 
-class Critic:
+class Actor_Skill:
+    def __init__(self):
+        pass
+
+
+class Critic_Moving:
+    def __init__(self, name):
+        pass
+
+    
+class Critic_Skill:
     def __init__(self, name):
         pass
 
 
 class Agent:
     def __init__(self):
+        self.actor_moving = Actor_Moving()
+        self.actor_skill = Actor_Skill()
+        self.critic_moving = Critic_Moving()
+        self.critic_skill = Critic_Skill()
+
+    
+
+    def train_model(self):
         pass
 
-
-class LSTM:
-    def __init__(self):
+    def get_moving_action(self):
         pass
 
+    def get_skill_action(self):
+        pass
+
+    def append_sample(self):
+        pass
+
+    def save_model(self):
+        pass
+
+    def make_Summary(self):
+        pass
+
+    def write_Summary(self):
+        pass
+    
 
 if __name__ == "__main__":
     env = football_env.create_environment(
@@ -74,7 +107,8 @@ if __name__ == "__main__":
     step = 0
 
     for episode in range(run_episode + test_episode):
-        if episode == run_episode: train_mode = False
+        if episode == run_episode:
+            train_mode = False
 
         env.reset()
         episode_reward1 = 0.0
@@ -82,5 +116,21 @@ if __name__ == "__main__":
 
         obs, reward, done, info = env.step([12, 12])
 
-        state1 = []
-        state2 = []
+        state1 = np.concatenate(
+            (np.where(obs[0] == 255)[0], np.where(obs[0] == 255)[1]), axis=None)
+        state2 = np.concatenate(
+            (np.where(obs[1] == 255)[0], np.where(obs[1] == 255)[1]), axis=None)
+
+        while not done:
+            step += 1
+
+            next_obs, reward, done, info = env.step([12, 12])
+
+            next_state1 = np.concatenate(
+                (np.where(next_obs[0] == 255)[0], np.where(next_obs[0] == 255)[1]), axis=None)
+            next_state2 = np.concatenate(
+                (np.where(next_obs[1] == 255)[0], np.where(next_obs[1] == 255)[1]), axis=None)
+
+            if step % 20 == 0:
+                agent1.train_model()
+                agent2.train_model()
