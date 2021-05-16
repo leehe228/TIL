@@ -337,7 +337,7 @@ if __name__ == '__main__':
             next_state1 = next_obs[0]
             next_state2 = next_obs[1]
 
-            print("s: {} | ep: {}({}%) | r1: {:.3f} | r2: {:.3f} | a1 : {} | a2 : {} | s1 : {} | s2 : {}                  ".format(step, (ps * 100 // 3000), episode, episode_rewards1, episode_rewards2, action_set[action1_moving], action_set[action2_moving], action_set[action1_skill], action_set[action2_skill]), end='\r')
+            print("s: {} | ep: {}({}%) | r1: {:.3f} | r2: {:.3f} | a1 : {} | a2 : {} | s1 : {} | s2 : {}                  ".format(step, episode, (ps * 100 // 3000), episode_rewards1, episode_rewards2, action_set[action1_moving], action_set[action2_moving], action_set[action1_skill], action_set[action2_skill]), end='\r')
 
             # if now_active1 == active1:
             #     reward1 -= 0.0005
