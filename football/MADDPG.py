@@ -1,41 +1,44 @@
+#-*-coding:utf-8-*-
+
 import gfootball.env as football_env
 
 import tensorflow as tf
 import numpy as np
 import random
 import datetime
-import math
 from collections import deque
 
-state_size = 48
+action_set = ['0', '←', '↖', '↑', '↗', '→', '↘', '↓', '↙', 'long', 'high', 'short', 'shoot', '+run', '-', '-run', 'sliding', '+dribble', '-dribble']
+
+state_size = 115
 moving_action_size = 8
-skill_action_size = 11
+skill_action_size = 10
 
 load_model = False
 train_mode = True
-render_mode = True
+render_mode = False
 
 num_to_control = 1
 academy_scenario = '11_vs_11_stochastic'
 scoring = 'scoring,checkpoints'
 
 batch_size = 128
-mem_maxlen = 50000
+mem_maxlen = 100000
 discount_factor = 0.99
-actor_lr = 1e-4
-critic_lr = 5e-4
-tau = 1e-3
+actor_lr = 0.00001
+critic_lr = 0.00005
+tau = 0.00003
 
 mu = 0
-theta = 1e-3
-sigma = 2e-3
+theta = 0.00001
+sigma = 0.00003
 
-start_train_episode = 100
-run_episode = 500
-test_episode = 100
+start_train_episode = 0
+run_episode = 1000
+test_episode = 20
 
-print_interval = 5
-save_interval = 100
+print_interval = 1
+# save_interval = 1
 
 date_time = datetime.datetime.now().strftime("%Y%m%d-%H-%M-%S")
 
@@ -98,40 +101,45 @@ class Agent:
     def __init__(self, number):
         self.actor_moving = Actor_Moving("actor_moving" + number)
         self.critic_moving = Critic_Moving("critic_moving" + number)
+
         self.actor_skill = Actor_Skill("actor_skill" + number)
         self.critic_skill = Critic_Skill("critic_skill" + number)
+
         self.target_actor_moving = Actor_Moving("target_actor_moving" + number)
         self.target_critic_moving = Critic_Moving("target_critic_moving" + number)
+
         self.target_actor_skill = Actor_Skill("target_actor_skill" + number)
         self.target_critic_skill = Critic_Skill("target_critic_skill" + number)
         
         self.target_q_moving = tf.placeholder(tf.float32, [None, 1])
         self.target_q_skill = tf.placeholder(tf.float32, [None, 1])
+
         critic_moving_loss = tf.losses.mean_squared_error(self.target_q_moving, self.critic_moving.predict_q)
         critic_skill_loss = tf.losses.mean_squared_error(self.target_q_skill, self.critic_skill.predict_q)
+
         self.train_critic_moving = tf.train.AdamOptimizer(critic_lr).minimize(critic_moving_loss)
         self.train_critic_skill = tf.train.AdamOptimizer(critic_lr).minimize(critic_skill_loss)
 
         action_grad_moving = tf.gradients(tf.squeeze(self.critic_moving.predict_q), self.critic_moving.action)
         action_grad_skill = tf.gradients(tf.squeeze(self.critic_skill.predict_q), self.critic_skill.action)
+
         policy_grad_moving = tf.gradients(self.actor_moving.action, self.actor_moving.trainable_var, action_grad_moving)
         policy_grad_skill = tf.gradients(self.actor_skill.action, self.actor_skill.trainable_var, action_grad_skill)
+
         for idx, grads in enumerate(policy_grad_moving):
             policy_grad_moving[idx] = -grads/batch_size
-        self.train_actor_moving = tf.train.AdamOptimizer(actor_lr).apply_gradients(
-                                                            zip(policy_grad_moving, self.actor_moving.trainable_var))
+        self.train_actor_moving = tf.train.AdamOptimizer(actor_lr).apply_gradients(zip(policy_grad_moving, self.actor_moving.trainable_var))
 
         for idx, grads in enumerate(policy_grad_skill):
             policy_grad_skill[idx] = -grads/batch_size
-        self.train_actor_skill = tf.train.AdamOptimizer(actor_lr).apply_gradients(
-                                                            zip(policy_grad_skill, self.actor_skill.trainable_var))
+        self.train_actor_skill = tf.train.AdamOptimizer(actor_lr).apply_gradients(zip(policy_grad_skill, self.actor_skill.trainable_var))
   
         self.sess_moving = tf.Session()
-        self.sess_skill = tf.Session()
         self.sess_moving.run(tf.global_variables_initializer())
+        self.sess_skill = tf.Session()
         self.sess_skill.run(tf.global_variables_initializer())
 
-        # self.Saver = tf.train.Saver()
+        self.Saver = tf.train.Saver()
         self.Summary, self.Merge = self.Make_Summary()
         self.memory_moving = deque(maxlen=mem_maxlen)
         self.memory_skill = deque(maxlen=mem_maxlen)
@@ -170,21 +178,16 @@ class Agent:
 
 
     def get_action_moving(self, state):
-        
         actions = self.sess_moving.run(self.actor_moving.action, feed_dict={self.actor_moving.state: [state]})
-
         return actions
 
 
     def get_action_skill(self, state):
-        
         actions = self.sess_skill.run(self.actor_skill.action, feed_dict={self.actor_skill.state: [state]})
-
         return actions
 
     def append_sample_moving(self, state, action, reward, next_state, done):
         self.memory_moving.append((state, action, reward, next_state, done))
-
 
     def append_sample_skill(self, state, action, reward, next_state, done):
         self.memory_skill.append((state, action, reward, next_state, done))
@@ -210,7 +213,7 @@ class Agent:
                                                         rewards, target_critic_predict_qs_moving, dones)])
         self.sess_moving.run(self.train_critic_moving, feed_dict={self.critic_moving.state: states,
                                                     self.critic_moving.action: actions,
-                                                    self.target_q: target_qs_moving})
+                                                    self.target_q_moving: target_qs_moving})
 
         actions_for_train_moving = self.sess_moving.run(self.actor_moving.action, feed_dict={self.actor_moving.state: states})
         self.sess_moving.run(self.train_actor_moving, feed_dict={self.actor_moving.state: states,
@@ -238,7 +241,7 @@ class Agent:
                                                         rewards, target_critic_predict_qs_skill, dones)])
         self.sess_skill.run(self.train_critic_skill, feed_dict={self.critic_skill.state: states,
                                                     self.critic_skill.action: actions,
-                                                    self.target_q: target_qs_skill})
+                                                    self.target_q_skill: target_qs_skill})
 
         actions_for_train_skill = self.sess_skill.run(self.actor_skill.action, feed_dict={self.actor_skill.state: states})
         self.sess_skill.run(self.train_actor_skill, feed_dict={self.actor_skill.state: states,
@@ -250,11 +253,7 @@ class Agent:
 
     def Make_Summary(self):
         self.summary_rewards = tf.placeholder(tf.float32)
-        self.summary_reward1 = tf.placeholder(tf.float32)
-        self.summary_reward2 = tf.placeholder(tf.float32)
         tf.summary.scalar("mean rewards", self.summary_rewards)
-        tf.summary.scalar("reward1", self.summary_reward1)
-        tf.summary.scalar("reward2", self.summary_reward2)
         Summary = tf.summary.FileWriter(
             logdir=save_path, graph=self.sess_moving.graph)
         Merge = tf.summary.merge_all()
@@ -266,21 +265,14 @@ class Agent:
             self.summary_rewards: rewards}), episode)
 
 
-def calc_diff_ball(player, ball):
-    return math.sqrt((player[0] - ball[0])**2 + (player[1] - ball[1])**2)
-
-
-def is_Active_Have_Ball(player, ball):
-    return player == ball
-
-
 if __name__ == '__main__':
     env = football_env.create_environment(
         env_name=academy_scenario,
         rewards=scoring,
         render=render_mode,
         number_of_left_players_agent_controls=num_to_control,
-        number_of_right_players_agent_controls=num_to_control)
+        number_of_right_players_agent_controls=num_to_control,
+        representation='simple115v2')
 
     agent1 = Agent('1')
     agent2 = Agent('2')
@@ -294,86 +286,85 @@ if __name__ == '__main__':
         env.reset()
         episode_rewards1 = 0.0
         episode_rewards2 = 0.0
-        observation, reward, done, info = env.step([12, 12])
+        observation, reward, done, info = env.step([0, 0])
 
-        while True:
-            state1 = np.concatenate((np.where(observation[0] != 0)[0], np.where(observation[0] != 0)[1]), axis=None)
-            state2 = np.concatenate((np.where(observation[1] != 0)[0], np.where(observation[1] != 0)[1]), axis=None)
+        state1 = observation[0]
+        state2 = observation[1]
+        
+        action1_moving_arr = agent1.get_action_moving(state1)
+        action2_moving_arr = agent2.get_action_moving(state2)
+        action1_moving = np.argmax(action1_moving_arr) + 1
+        action2_moving = np.argmax(action2_moving_arr) + 1
 
-            if state1.size == 48 and state2.size == 48:
-                break
-
-        active1 = (np.where(observation[0, :, :, 3] != 0)[0][0], np.where(observation[0, :, :, 3] != 0)[1][0])
-        active2 = (np.where(observation[1, :, :, 3] != 0)[0][0], np.where(observation[1, :, :, 3] != 0)[1][0])
-
-        action1_moving = np.argmax(agent1.get_action_moving(state1))
-        action2_moving = np.argmax(agent2.get_action_moving(state2))
-        action1_skill = np.argmax(agent1.get_action_skill(state1)) + moving_action_size
-        action2_skill = np.argmax(agent1.get_action_skill(state2)) + moving_action_size
+        action1_skill_arr = agent1.get_action_skill(state1)
+        action2_skill_arr = agent1.get_action_skill(state2)
+        action1_skill = np.argmax(action1_skill_arr) + 9
+        action2_skill = np.argmax(action2_skill_arr) + 9
 
         while not done:
             step += 1
 
-            while True:
-                if step % 10 == 0:
-                    action1_moving = np.argmax(agent1.get_action_moving(state1))
-                    action2_moving = np.argmax(agent2.get_action_moving(state2))
-                else:
-                    action1_skill = np.argmax(agent1.get_action_skill(state1)) + moving_action_size
-                    action2_skill = np.argmax(agent1.get_action_skill(state2)) + moving_action_size
+            if step % 5 == 0:
+                action1_moving_arr = agent1.get_action_moving(state1)
+                action2_moving_arr = agent2.get_action_moving(state2)
+                action1_moving = np.argmax(action1_moving_arr) + 1
+                action2_moving = np.argmax(action2_moving_arr) + 1
 
-                if step % 10 == 0:
-                    next_obs, reward, done, info = env.step([action1_moving, action2_moving])
-                else:
-                    next_obs, reward, done, info = env.step([action1_skill, action2_skill])
-
-                reward1 = reward[0]
-                reward2 = reward[1]
-
-                next_state1 = np.concatenate((np.where(next_obs[0] != 0)[0], np.where(next_obs[0] != 0)[1]), axis=None)
-                next_state2 = np.concatenate((np.where(next_obs[1] != 0)[0], np.where(next_obs[1] != 0)[1]), axis=None)
-
-                if next_state1.size == 48 and next_state2.size == 48:
-                    break
-
-            now_active1 = (np.where(next_obs[0, :, :, 3] != 0)[0][0], np.where(next_obs[0, :, :, 3] != 0)[1][0])
-            now_active2 = (np.where(next_obs[1, :, :, 3] != 0)[0][0], np.where(next_obs[1, :, :, 3] != 0)[1][0])
-			
-            print("s: {} | ep: {} | r1: {:.3f} | r2: {:.3f} | a1 : {} | a2 : {} | s1 : {} | s2 : {} | na1 : {} | na2 : {}         ".format(step, episode, episode_rewards1, episode_rewards2, action1_moving, action2_moving, action1_skill, action2_skill, now_active1[0], now_active2[0]), end='\r')
-
-            if now_active1[0] > (72 // 2):
-                reward1 += 0.02
+                next_obs, reward, done, info = env.step([action1_moving, action2_moving])
             else:
-                reward1 -= 0.01
+                action1_skill_arr = agent1.get_action_skill(state1)
+                action2_skill_arr = agent1.get_action_skill(state2)
+                action1_skill = np.argmax(action1_skill_arr) + 9
+                action2_skill = np.argmax(action2_skill_arr) + 9
+
+                next_obs, reward, done, info = env.step([action1_skill, action2_skill])
+
+            reward1 = reward[0]
+            reward2 = reward[1]
+
+            next_state1 = next_obs[0]
+            next_state2 = next_obs[1]
+
+            print("s: {} | ep: {} | r1: {:.3f} | r2: {:.3f} | a1 : {} | a2 : {} | s1 : {} | s2 : {}         ".format(step, episode, episode_rewards1, episode_rewards2, action_set[action1_moving], action_set[action2_moving], action_set[action1_skill], action_set[action2_skill]), end='\r')
+
+            # if now_active1 == active1:
+            #     reward1 -= 0.0005
+            # if now_active2 == active2:
+            #     reward2 -= 0.0005
+
+            # if now_active1[0] > (72 // 2):
+            #     reward1 += 0.0002
+            # else:
+            #     reward1 -= 0.0001
                 
-            if now_active2[0] < (72 // 2):
-                reward2 += 0.02
-            else:
-                reward2 -= 0.01
+            # if now_active2[0] < (72 // 2):
+            #     reward2 += 0.0002
+            # else:
+            #     reward2 -= 0.0001
 
             episode_rewards1 += reward1
             episode_rewards2 += reward2
             
             if train_mode:
-                agent1.append_sample_moving(state1, action1_moving, reward1, next_state1, done)
-                agent1.append_sample_skill(state1, action1_skill, reward1, next_state1, done)
-                agent2.append_sample_moving(state2, action2_moving, reward2, next_state2, done)
-                agent2.append_sample_skill(state2, action2_skill, reward2, next_state2, done)
+                agent1.append_sample_moving(state1, action1_moving_arr[0], reward1, next_state1, done)
+                agent1.append_sample_skill(state1, action1_skill_arr[0], reward1, next_state1, done)
+                agent2.append_sample_moving(state2, action2_moving_arr[0], reward2, next_state2, done)
+                agent2.append_sample_skill(state2, action2_skill_arr[0], reward2, next_state2, done)
             
             state1 = next_state1
             state2 = next_state2
-            active1 = now_active1
-            active2 = now_active2
+            # active1 = now_active1
+            # active2 = now_active2
    
-            if episode > start_train_episode and train_mode and step % 25 == 0:
-                agent1.train_model_moving(step)
-                agent1.train_model_skill(step)
-                agent2.train_model_moving(step)
-                agent2.train_model_skill(step)
+            if episode > start_train_episode and train_mode and step % 10 == 0:
+                agent1.train_model_moving()
+                agent1.train_model_skill()
+                agent2.train_model_moving()
+                agent2.train_model_skill()
 
         if episode % print_interval == 0 and episode != 0:
-            print("step: {} | episode: {} | reward1: {:.3f} | reward2: {:.3f}".format(step, episode, episode_rewards1, episode_rewards2))
-            agent1.Write_Summray(episode_rewards1, episode)
-            agent2.Write_Summray(episode_rewards2, episode)
+            print("step: {} | episode: {} | mean r : {:.3f} | reward1: {:.3f} | reward2: {:.3f}".format(step, episode, (episode_rewards1 + episode_rewards2) / 2.0, episode_rewards1, episode_rewards2))
+            agent1.Write_Summray((episode_rewards1 + episode_rewards2) / 2.0, episode)
+            # agent2.Write_Summray(episode_rewards2, episode)
 
     env.close()

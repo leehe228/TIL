@@ -328,6 +328,9 @@ if __name__ == '__main__':
                 else:
                     next_obs, reward, done, info = env.step([action1_skill, action2_skill])
 
+                if done:
+                    break
+
                 reward1 += reward[0]
                 reward2 += reward[1]
 
@@ -361,10 +364,10 @@ if __name__ == '__main__':
             episode_rewards2 += reward2
             
             if train_mode:
-                agent1.append_sample_moving(state1, action1_moving_arr, reward1, next_state1, done)
-                agent1.append_sample_skill(state1, action1_skill_arr, reward1, next_state1, done)
-                agent2.append_sample_moving(state2, action2_moving_arr, reward2, next_state2, done)
-                agent2.append_sample_skill(state2, action2_skill_arr, reward2, next_state2, done)
+                agent1.append_sample_moving(state1, action1_moving_arr[0], reward1, next_state1, done)
+                agent1.append_sample_skill(state1, action1_skill_arr[0], reward1, next_state1, done)
+                agent2.append_sample_moving(state2, action2_moving_arr[0], reward2, next_state2, done)
+                agent2.append_sample_skill(state2, action2_skill_arr[0], reward2, next_state2, done)
             
             state1 = next_state1
             state2 = next_state2
