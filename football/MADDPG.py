@@ -253,16 +253,25 @@ class Agent:
 
     def Make_Summary(self):
         self.summary_rewards = tf.placeholder(tf.float32)
-        tf.summary.scalar("mean rewards", self.summary_rewards)
+        self.summary_reward1 = tf.placeholder(tf.float32)
+        self.summary_reward2 = tf.placeholder(tf.float32)
+        self.summary_max = tf.placeholder(tf.float32)
+        tf.summary.scalar("mean reward", self.summary_rewards)
+        tf.summary.scalar("reward1", self.summary_reward1)
+        tf.summary.scalar("reward2", self.summary_reward2)
+        tf.summary.scalar("max reward", self.summary_max)
         Summary = tf.summary.FileWriter(
             logdir=save_path, graph=self.sess_moving.graph)
         Merge = tf.summary.merge_all()
 
         return Summary, Merge
         
-    def Write_Summray(self, rewards, episode):
+    def Write_Summray(self, rewards, r1, r2, m, episode):
         self.Summary.add_summary(self.sess_moving.run(self.Merge, feed_dict={
-            self.summary_rewards: rewards}), episode)
+            self.summary_rewards: rewards,
+            self.summary_reward1: r1,
+            self.summary_reward2: r2,
+            self.summary_max: m}), episode)
 
 
 if __name__ == '__main__':
@@ -364,7 +373,7 @@ if __name__ == '__main__':
 
         if episode % print_interval == 0 and episode != 0:
             print("step: {} | episode: {} | mean r : {:.3f} | reward1: {:.3f} | reward2: {:.3f}".format(step, episode, (episode_rewards1 + episode_rewards2) / 2.0, episode_rewards1, episode_rewards2))
-            agent1.Write_Summray((episode_rewards1 + episode_rewards2) / 2.0, episode)
+            agent1.Write_Summray((episode_rewards1 + episode_rewards2) / 2.0, episode_rewards1, episode_rewards2, max(episode_rewards1, episode_rewards2),episode)
             # agent2.Write_Summray(episode_rewards2, episode)
 
     env.close()
