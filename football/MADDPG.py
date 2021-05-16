@@ -19,7 +19,7 @@ train_mode = True
 render_mode = False
 
 num_to_control = 1
-academy_scenario = '11_vs_11_stochastic'
+academy_scenario = '11_vs_11_easy_stochastic'
 scoring = 'scoring,checkpoints'
 
 batch_size = 128
@@ -114,25 +114,25 @@ class Agent:
         self.target_q_moving = tf.placeholder(tf.float32, [None, 1])
         self.target_q_skill = tf.placeholder(tf.float32, [None, 1])
 
-        critic_moving_loss = tf.losses.mean_squared_error(self.target_q_moving, self.critic_moving.predict_q)
-        critic_skill_loss = tf.losses.mean_squared_error(self.target_q_skill, self.critic_skill.predict_q)
+        self.critic_moving_loss = tf.losses.mean_squared_error(self.target_q_moving, self.critic_moving.predict_q)
+        self.critic_skill_loss = tf.losses.mean_squared_error(self.target_q_skill, self.critic_skill.predict_q)
 
-        self.train_critic_moving = tf.train.AdamOptimizer(critic_lr).minimize(critic_moving_loss)
-        self.train_critic_skill = tf.train.AdamOptimizer(critic_lr).minimize(critic_skill_loss)
+        self.train_critic_moving = tf.train.AdamOptimizer(critic_lr).minimize(self.critic_moving_loss)
+        self.train_critic_skill = tf.train.AdamOptimizer(critic_lr).minimize(self.critic_skill_loss)
 
-        action_grad_moving = tf.gradients(tf.squeeze(self.critic_moving.predict_q), self.critic_moving.action)
-        action_grad_skill = tf.gradients(tf.squeeze(self.critic_skill.predict_q), self.critic_skill.action)
+        self.action_grad_moving = tf.gradients(tf.squeeze(self.critic_moving.predict_q), self.critic_moving.action)
+        self.action_grad_skill = tf.gradients(tf.squeeze(self.critic_skill.predict_q), self.critic_skill.action)
 
-        policy_grad_moving = tf.gradients(self.actor_moving.action, self.actor_moving.trainable_var, action_grad_moving)
-        policy_grad_skill = tf.gradients(self.actor_skill.action, self.actor_skill.trainable_var, action_grad_skill)
+        self.policy_grad_moving = tf.gradients(self.actor_moving.action, self.actor_moving.trainable_var, self.action_grad_moving)
+        self.policy_grad_skill = tf.gradients(self.actor_skill.action, self.actor_skill.trainable_var, self.action_grad_skill)
 
-        for idx, grads in enumerate(policy_grad_moving):
-            policy_grad_moving[idx] = -grads/batch_size
-        self.train_actor_moving = tf.train.AdamOptimizer(actor_lr).apply_gradients(zip(policy_grad_moving, self.actor_moving.trainable_var))
+        for idx, grads in enumerate(self.policy_grad_moving):
+            self.policy_grad_moving[idx] = -grads/batch_size
+        self.train_actor_moving = tf.train.AdamOptimizer(actor_lr).apply_gradients(zip(self.policy_grad_moving, self.actor_moving.trainable_var))
 
-        for idx, grads in enumerate(policy_grad_skill):
-            policy_grad_skill[idx] = -grads/batch_size
-        self.train_actor_skill = tf.train.AdamOptimizer(actor_lr).apply_gradients(zip(policy_grad_skill, self.actor_skill.trainable_var))
+        for idx, grads in enumerate(self.policy_grad_skill):
+            self.policy_grad_skill[idx] = -grads/batch_size
+        self.train_actor_skill = tf.train.AdamOptimizer(actor_lr).apply_gradients(zip(self.policy_grad_skill, self.actor_skill.trainable_var))
   
         self.sess_moving = tf.Session()
         self.sess_moving.run(tf.global_variables_initializer())
@@ -306,14 +306,17 @@ if __name__ == '__main__':
         action2_moving = np.argmax(action2_moving_arr) + 1
 
         action1_skill_arr = agent1.get_action_skill(state1)
-        action2_skill_arr = agent1.get_action_skill(state2)
+        action2_skill_arr = agent2.get_action_skill(state2)
         action1_skill = np.argmax(action1_skill_arr) + 9
         action2_skill = np.argmax(action2_skill_arr) + 9
 
+        ps = 0
+
         while not done:
             step += 1
+            ps += 1
 
-            if step % 5 == 0:
+            if step % 10 == 0:
                 action1_moving_arr = agent1.get_action_moving(state1)
                 action2_moving_arr = agent2.get_action_moving(state2)
                 action1_moving = np.argmax(action1_moving_arr) + 1
@@ -322,7 +325,7 @@ if __name__ == '__main__':
                 next_obs, reward, done, info = env.step([action1_moving, action2_moving])
             else:
                 action1_skill_arr = agent1.get_action_skill(state1)
-                action2_skill_arr = agent1.get_action_skill(state2)
+                action2_skill_arr = agent2.get_action_skill(state2)
                 action1_skill = np.argmax(action1_skill_arr) + 9
                 action2_skill = np.argmax(action2_skill_arr) + 9
 
@@ -334,7 +337,7 @@ if __name__ == '__main__':
             next_state1 = next_obs[0]
             next_state2 = next_obs[1]
 
-            print("s: {} | ep: {} | r1: {:.3f} | r2: {:.3f} | a1 : {} | a2 : {} | s1 : {} | s2 : {}         ".format(step, episode, episode_rewards1, episode_rewards2, action_set[action1_moving], action_set[action2_moving], action_set[action1_skill], action_set[action2_skill]), end='\r')
+            print("s: {} | ep: {}({}%) | r1: {:.3f} | r2: {:.3f} | a1 : {} | a2 : {} | s1 : {} | s2 : {}                  ".format(step, (ps * 100 // 3000), episode, episode_rewards1, episode_rewards2, action_set[action1_moving], action_set[action2_moving], action_set[action1_skill], action_set[action2_skill]), end='\r')
 
             # if now_active1 == active1:
             #     reward1 -= 0.0005
@@ -372,8 +375,8 @@ if __name__ == '__main__':
                 agent2.train_model_skill()
 
         if episode % print_interval == 0 and episode != 0:
-            print("step: {} | episode: {} | mean r : {:.3f} | reward1: {:.3f} | reward2: {:.3f}".format(step, episode, (episode_rewards1 + episode_rewards2) / 2.0, episode_rewards1, episode_rewards2))
-            agent1.Write_Summray((episode_rewards1 + episode_rewards2) / 2.0, episode_rewards1, episode_rewards2, max(episode_rewards1, episode_rewards2),episode)
+            print("step: {} | episode: {} | mean : {:.3f} | reward1: {:.3f} | reward2: {:.3f}".format(step, episode, (episode_rewards1 + episode_rewards2) / 2.0, episode_rewards1, episode_rewards2))
+            agent1.Write_Summray((episode_rewards1 + episode_rewards2) / 2.0, episode_rewards1, episode_rewards2, max(episode_rewards1, episode_rewards2), episode)
             # agent2.Write_Summray(episode_rewards2, episode)
 
     env.close()
