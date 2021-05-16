@@ -4,6 +4,7 @@ import tensorflow as tf
 import numpy as np
 import random
 import datetime
+import math
 from collections import deque
 
 state_size = 48
@@ -39,8 +40,8 @@ save_interval = 100
 date_time = datetime.datetime.now().strftime("%Y%m%d-%H-%M-%S")
 
 
-save_path = "./saved_models/DDPG/" + date_time
-load_path = "./saved_models/DDPG/" + date_time + "/model0/model"
+save_path = "./saved_models/MADDPG/" + date_time
+load_path = "./saved_models/MADDPG/" + date_time + "/model0/model"
 
 
 class Actor_Moving:
@@ -263,6 +264,14 @@ class Agent:
     def Write_Summray(self, rewards, episode):
         self.Summary.add_summary(self.sess_moving.run(self.Merge, feed_dict={
             self.summary_rewards: rewards}), episode)
+
+
+def calc_diff_ball(player, ball):
+    return math.sqrt((player[0] - ball[0])**2 + (player[1] - ball[1])**2)
+
+
+def is_Active_Have_Ball(player, ball):
+    return player == ball
 
 
 if __name__ == '__main__':
