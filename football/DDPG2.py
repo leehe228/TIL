@@ -295,10 +295,15 @@ if __name__ == '__main__':
         active1 = (np.where(observation[0, :, :, 3] != 0)[0][0], np.where(observation[0, :, :, 3] != 0)[1][0])
         active2 = (np.where(observation[1, :, :, 3] != 0)[0][0], np.where(observation[1, :, :, 3] != 0)[1][0])
 
-        action1_moving = np.argmax(agent1.get_action_moving(state1)) + 1
-        action2_moving = np.argmax(agent2.get_action_moving(state2)) + 1
-        action1_skill = np.argmax(agent1.get_action_skill(state1)) + 9
-        action2_skill = np.argmax(agent1.get_action_skill(state2)) + 9
+        action1_moving_arr = agent1.get_action_moving(state1)
+        action2_moving_arr = agent2.get_action_moving(state2)
+        action1_moving = np.argmax(action1_moving_arr) + 1
+        action2_moving = np.argmax(action2_moving_arr) + 1
+
+        action1_skill_arr = agent1.get_action_skill(state1)
+        action2_skill_arr = agent1.get_action_skill(state2)
+        action1_skill = np.argmax(action1_skill_arr) + 9
+        action2_skill = np.argmax(action2_skill_arr) + 9
 
         while not done:
             step += 1
@@ -308,11 +313,15 @@ if __name__ == '__main__':
 
             while True:
                 if step % 10 == 0:
-                    action1_moving = np.argmax(agent1.get_action_moving(state1)) + 1
-                    action2_moving = np.argmax(agent2.get_action_moving(state2)) + 1
+                    action1_moving_arr = agent1.get_action_moving(state1)
+                    action2_moving_arr = agent2.get_action_moving(state2)
+                    action1_moving = np.argmax(action1_moving_arr) + 1
+                    action2_moving = np.argmax(action2_moving_arr) + 1
                 else:
-                    action1_skill = np.argmax(agent1.get_action_skill(state1)) + 9
-                    action2_skill = np.argmax(agent1.get_action_skill(state2)) + 9
+                    action1_skill_arr = agent1.get_action_skill(state1)
+                    action2_skill_arr = agent1.get_action_skill(state2)
+                    action1_skill = np.argmax(action1_skill_arr) + 9
+                    action2_skill = np.argmax(action2_skill_arr) + 9
 
                 if step % 10 == 0:
                     next_obs, reward, done, info = env.step([action1_moving, action2_moving])
@@ -352,10 +361,10 @@ if __name__ == '__main__':
             episode_rewards2 += reward2
             
             if train_mode:
-                agent1.append_sample_moving(state1, action1_moving, reward1, next_state1, done)
-                agent1.append_sample_skill(state1, action1_skill, reward1, next_state1, done)
-                agent2.append_sample_moving(state2, action2_moving, reward2, next_state2, done)
-                agent2.append_sample_skill(state2, action2_skill, reward2, next_state2, done)
+                agent1.append_sample_moving(state1, action1_moving_arr, reward1, next_state1, done)
+                agent1.append_sample_skill(state1, action1_skill_arr, reward1, next_state1, done)
+                agent2.append_sample_moving(state2, action2_moving_arr, reward2, next_state2, done)
+                agent2.append_sample_skill(state2, action2_skill_arr, reward2, next_state2, done)
             
             state1 = next_state1
             state2 = next_state2
