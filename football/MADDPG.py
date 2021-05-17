@@ -38,13 +38,13 @@ run_episode = 1000
 test_episode = 20
 
 print_interval = 1
-# save_interval = 1
+save_interval = 1
 
 date_time = datetime.datetime.now().strftime("%Y%m%d-%H-%M-%S")
 
 
 save_path = "./saved_models/MADDPG/" + date_time
-load_path = "./saved_models/MADDPG/" + date_time + "/model0/model"
+load_path = "./saved_models/MADDPG//model0/model"
 
 
 class Actor_Moving:
@@ -99,6 +99,7 @@ class Critic_Skill:
 
 class Agent:
     def __init__(self, number):
+        self.number = number
         self.actor_moving = Actor_Moving("actor_moving" + number)
         self.critic_moving = Critic_Moving("critic_moving" + number)
 
@@ -140,7 +141,7 @@ class Agent:
         self.sess_skill.run(tf.global_variables_initializer())
 
         self.Saver = tf.train.Saver()
-        self.Summary, self.Merge = self.Make_Summary()
+        self.Summary1, self.Summary2, self.Merge = self.Make_Summary()
         self.memory_moving = deque(maxlen=mem_maxlen)
         self.memory_skill = deque(maxlen=mem_maxlen)
 
@@ -173,8 +174,9 @@ class Agent:
             init_update_target_skill.append(self.target_critic_skill.trainable_var[idx].assign(self.critic_skill.trainable_var[idx]))
         self.sess_skill.run(init_update_target_skill)
 
-        #if load_model == True:
-        #    self.Saver.restore(self.sess, load_path)
+        if load_model == True:
+            self.Saver.restore(self.sess_moving, load_path + "_moving" + number)
+            self.Saver.restore(self.sess_skill, load_path + "_skill" + number)
 
 
     def get_action_moving(self, state):
@@ -192,8 +194,9 @@ class Agent:
     def append_sample_skill(self, state, action, reward, next_state, done):
         self.memory_skill.append((state, action, reward, next_state, done))
 
-    #def save_model(self):
-    #    self.Saver.save(self.sess, save_path + "/model/model")
+    def save_model(self, episode):
+        self.Saver.save(self.sess_moving, save_path + "/model" + episode + "/model_moving" + self.number)
+        self.Saver.save(self.sess_skill, save_path + "/model" + episode +"/model_skill" + self.number)
     
     def train_model_moving(self):
         mini_batch = random.sample(self.memory_moving, batch_size)
@@ -252,26 +255,24 @@ class Agent:
 
 
     def Make_Summary(self):
-        self.summary_rewards = tf.placeholder(tf.float32)
-        self.summary_reward1 = tf.placeholder(tf.float32)
-        self.summary_reward2 = tf.placeholder(tf.float32)
-        self.summary_max = tf.placeholder(tf.float32)
-        tf.summary.scalar("mean reward", self.summary_rewards)
-        tf.summary.scalar("reward1", self.summary_reward1)
-        tf.summary.scalar("reward2", self.summary_reward2)
-        tf.summary.scalar("max reward", self.summary_max)
-        Summary = tf.summary.FileWriter(
-            logdir=save_path, graph=self.sess_moving.graph)
+        self.summary_mean_rewards = tf.placeholder(tf.float32)
+        self.summary_reward = tf.placeholder(tf.float32)
+        tf.summary.scalar("mean reward", self.summary_mean_rewards)
+        tf.summary.scalar("reward", self.summary_reward)
+        Summary1 = tf.summary.FileWriter(logdir=save_path + "_moving" + self.number, graph=self.sess_moving.graph)
+        Summary2 = tf.summary.FileWriter(logdir=save_path + "_skill" + self.number, graph=self.sess_skill.graph)
         Merge = tf.summary.merge_all()
 
-        return Summary, Merge
+        return Summary1, Summary2, Merge
         
-    def Write_Summray(self, rewards, r1, r2, m, episode):
-        self.Summary.add_summary(self.sess_moving.run(self.Merge, feed_dict={
-            self.summary_rewards: rewards,
-            self.summary_reward1: r1,
-            self.summary_reward2: r2,
-            self.summary_max: m}), episode)
+    def Write_Summray(self, rewards, r, episode):
+        self.Summary1.add_summary(self.sess_moving.run(self.Merge, feed_dict={
+            self.summary_mean_rewards: rewards,
+            self.summary_reward: r}), episode)
+
+        self.Summary2.add_summary(self.sess_skill.run(self.Merge, feed_dict={
+            self.summary_mean_rewards: rewards,
+            self.summary_reward: r}), episode)
 
 
 if __name__ == '__main__':
@@ -376,7 +377,11 @@ if __name__ == '__main__':
 
         if episode % print_interval == 0 and episode != 0:
             print("step: {} | episode: {} | mean : {:.3f} | reward1: {:.3f} | reward2: {:.3f}".format(step, episode, (episode_rewards1 + episode_rewards2) / 2.0, episode_rewards1, episode_rewards2))
-            agent1.Write_Summray((episode_rewards1 + episode_rewards2) / 2.0, episode_rewards1, episode_rewards2, max(episode_rewards1, episode_rewards2), episode)
-            # agent2.Write_Summray(episode_rewards2, episode)
+            agent1.Write_Summray((episode_rewards1 + episode_rewards2) / 2.0, episode_rewards1, episode)
+            agent2.Write_Summray((episode_rewards1 + episode_rewards2) / 2.0, episode_rewards2, episode)
+
+        if train_mode and episode % save_interval == 0 and episode != 0:
+            agent1.save_model(episode)
+            agent2.save_model(episode)
 
     env.close()
