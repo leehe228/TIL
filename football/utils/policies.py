@@ -59,6 +59,10 @@ class DiscretePolicy(BasePolicy):
                 return_entropy=False):
         out = super(DiscretePolicy, self).forward(obs)
         probs = F.softmax(out, dim=1)
+        
+        if (not sample):
+            print(probs)
+
         on_gpu = next(self.parameters()).is_cuda
         if sample:
             int_act, act = categorical_sample(probs, use_cuda=on_gpu)

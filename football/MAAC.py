@@ -85,7 +85,18 @@ def run(config):
             agent_actions = [ac.data.numpy() for ac in torch_agent_actions]
             # rearrange actions to be per environment
             actions = [[ac[i] for ac in agent_actions] for i in range(config["n_rollout_threads"])]
-            next_obs, rewards, dones, infos = env.step(actions)
+            
+            actions_list = []
+            for a in actions:
+                temp = []
+                for b in a:
+                    temp.append(np.argmax(b))
+                actions_list.append(temp)
+
+            next_obs, rewards, dones, infos = env.step(actions_list)
+
+            dones = [dones for _ in range(11)]
+
             replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
             obs = next_obs
             t += config["n_rollout_threads"]
