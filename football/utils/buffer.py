@@ -75,13 +75,14 @@ class ReplayBuffer(object):
             cast = lambda x: Variable(Tensor(x), requires_grad=False).cuda()
         else:
             cast = lambda x: Variable(Tensor(x), requires_grad=False)
-        if norm_rews:
+        """if norm_rews:
             ret_rews = [cast((self.rew_buffs[i][inds] -
                               self.rew_buffs[i][:self.filled_i].mean()) /
                              self.rew_buffs[i][:self.filled_i].std())
                         for i in range(self.num_agents)]
         else:
-            ret_rews = [cast(self.rew_buffs[i][inds]) for i in range(self.num_agents)]
+            ret_rews = [cast(self.rew_buffs[i][inds]) for i in range(self.num_agents)]"""
+        ret_rews = [cast(self.rew_buffs[i][inds]) for i in range(self.num_agents)]
         return ([cast(self.obs_buffs[i][inds]) for i in range(self.num_agents)],
                 [cast(self.ac_buffs[i][inds]) for i in range(self.num_agents)],
                 ret_rews,
