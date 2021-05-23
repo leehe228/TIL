@@ -43,8 +43,8 @@ print_interval = 1
 date_time = datetime.datetime.now().strftime("%Y%m%d-%H-%M-%S")
 
 
-save_path = "./saved_models/MADDPG/" + date_time
-load_path = "./saved_models/MADDPG/" + date_time + "/model0/model"
+save_path = "./saved_models/A2C/" + date_time
+load_path = "./saved_models/A2C/" + date_time + "/model0/model"
 
 
 class Actor_Moving:
@@ -253,25 +253,16 @@ class Agent:
 
     def Make_Summary(self):
         self.summary_rewards = tf.placeholder(tf.float32)
-        self.summary_reward1 = tf.placeholder(tf.float32)
-        self.summary_reward2 = tf.placeholder(tf.float32)
-        self.summary_max = tf.placeholder(tf.float32)
         tf.summary.scalar("mean reward", self.summary_rewards)
-        tf.summary.scalar("reward1", self.summary_reward1)
-        tf.summary.scalar("reward2", self.summary_reward2)
-        tf.summary.scalar("max reward", self.summary_max)
         Summary = tf.summary.FileWriter(
             logdir=save_path, graph=self.sess_moving.graph)
         Merge = tf.summary.merge_all()
 
         return Summary, Merge
         
-    def Write_Summray(self, rewards, r1, r2, m, episode):
+    def Write_Summray(self, rewards, episode):
         self.Summary.add_summary(self.sess_moving.run(self.Merge, feed_dict={
-            self.summary_rewards: rewards,
-            self.summary_reward1: r1,
-            self.summary_reward2: r2,
-            self.summary_max: m}), episode)
+            self.summary_rewards: rewards}), episode)
 
 
 if __name__ == '__main__':
@@ -282,102 +273,55 @@ if __name__ == '__main__':
         number_of_left_players_agent_controls=num_to_control,
         representation='simple115v2')
 
-    agent1 = Agent('1')
-    # agent2 = Agent('2')
-
+    agent = Agent('1')
     step = 0
 
     for episode in range(run_episode + test_episode):
         if episode == run_episode:
             train_mode = False
 
-        observation = env.reset()
-        episode_rewards1 = 0.0
-        # episode_rewards2 = 0.0
-
-        # state1 = observation[0]
-        # state2 = observation[1]
-        state1 = observation
+        done = False
         
-        action1_moving_arr = agent1.get_action_moving(state1)
-        # action2_moving_arr = agent2.get_action_moving(state2)
-        action1_moving = np.argmax(action1_moving_arr) + 1
-        # action2_moving = np.argmax(action2_moving_arr) + 1
+        obs = env.reset()
+        episode_rewards = 0.0
 
-        action1_skill_arr = agent1.get_action_skill(state1)
-        # action2_skill_arr = agent2.get_action_skill(state2)
-        action1_skill = np.argmax(action1_skill_arr) + 9
-        # action2_skill = np.argmax(action2_skill_arr) + 9
+        action_moving_arr = agent.get_action_moving(obs)
+        action_moving = np.argmax(action_moving_arr) + 1
 
-        ps = 0
+        action_skill_arr = agent.get_action_skill(obs)
+        action_skill = np.argmax(action_skill_arr) + 9
 
         while not done:
             step += 1
-            ps += 1
 
             if step % 10 == 0:
-                action1_moving_arr = agent1.get_action_moving(state1)
-                # action2_moving_arr = agent2.get_action_moving(state2)
-                action1_moving = np.argmax(action1_moving_arr) + 1
-                # action2_moving = np.argmax(action2_moving_arr) + 1
+                action_moving_arr = agent.get_action_moving(obs)
+                action_moving = np.argmax(action_moving_arr) + 1
 
-                # next_obs, reward, done, info = env.step([action1_moving, action2_moving])
-                next_obs, reward, done, info = env.step(action1_moving)
+                next_obs, reward, done, info = env.step(action_moving)
             else:
-                action1_skill_arr = agent1.get_action_skill(state1)
-                # action2_skill_arr = agent2.get_action_skill(state2)
-                action1_skill = np.argmax(action1_skill_arr) + 9
-                # action2_skill = np.argmax(action2_skill_arr) + 9
+                action_skill_arr = agent.get_action_skill(obs)
+                action_skill = np.argmax(action_skill_arr) + 9
 
-                # next_obs, reward, done, info = env.step([action1_skill, action2_skill])
-                next_obs, reward, done, info = env.step(action1_skill)
+                next_obs, reward, done, info = env.step(action_skill)
 
-            # reward1 = reward[0]
-            # reward2 = reward[1]
+            print("s: {} | ep: {} | r: {:.3f} | a : {} | s : {} |               ".format(step, episode, episode_rewards, action_set[action_moving], action_set[action_skill]), end='\r')
 
-            next_state1 = next_obs[0]
-            next_state2 = next_obs[1]
-
-            print("s: {} | ep: {}({}%) | r1: {:.3f} | r2: {:.3f} | a1 : {} | a2 : {} | s1 : {} | s2 : {}                  ".format(step, episode, (ps * 100 // 3000), episode_rewards1, episode_rewards2, action_set[action1_moving], action_set[action2_moving], action_set[action1_skill], action_set[action2_skill]), end='\r')
-
-            # if now_active1 == active1:
-            #     reward1 -= 0.0005
-            # if now_active2 == active2:
-            #     reward2 -= 0.0005
-
-            # if now_active1[0] > (72 // 2):
-            #     reward1 += 0.0002
-            # else:
-            #     reward1 -= 0.0001
-                
-            # if now_active2[0] < (72 // 2):
-            #     reward2 += 0.0002
-            # else:
-            #     reward2 -= 0.0001
-
-            episode_rewards1 += reward1
-            episode_rewards2 += reward2
+            episode_rewards += reward
             
             if train_mode:
-                agent1.append_sample_moving(state1, action1_moving_arr[0], reward1, next_state1, done)
-                agent1.append_sample_skill(state1, action1_skill_arr[0], reward1, next_state1, done)
-                agent2.append_sample_moving(state2, action2_moving_arr[0], reward2, next_state2, done)
-                agent2.append_sample_skill(state2, action2_skill_arr[0], reward2, next_state2, done)
+                agent.append_sample_moving(obs, action_moving_arr[0], reward, next_obs, done)
+                agent.append_sample_skill(obs, action_skill_arr[0], reward, next_obs, done)
             
-            state1 = next_state1
-            state2 = next_state2
-            # active1 = now_active1
-            # active2 = now_active2
+            obs = next_obs
    
             if episode > start_train_episode and train_mode and step % 10 == 0:
-                agent1.train_model_moving()
-                agent1.train_model_skill()
-                agent2.train_model_moving()
-                agent2.train_model_skill()
+                agent.train_model_moving()
+                agent.train_model_skill()
 
         if episode % print_interval == 0 and episode != 0:
-            print("step: {} | episode: {} | mean : {:.3f} | reward1: {:.3f} | reward2: {:.3f}".format(step, episode, (episode_rewards1 + episode_rewards2) / 2.0, episode_rewards1, episode_rewards2))
-            agent1.Write_Summray((episode_rewards1 + episode_rewards2) / 2.0, episode_rewards1, episode_rewards2, max(episode_rewards1, episode_rewards2), episode)
-            # agent2.Write_Summray(episode_rewards2, episode)
+            print("s: {} | ep: {} | r: {:.3f} |                                                  ".format(step, episode, episode_rewards))
+            agent.Write_Summray(episode_rewards, episode)
+        
 
     env.close()

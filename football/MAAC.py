@@ -136,21 +136,21 @@ if __name__ == '__main__':
 
     config["env_id"] = "football"
     config["model_name"] = "MAAC"
-    config["n_rollout_threads"] = 12
+    config["n_rollout_threads"] = 16
     config["buffer_length"] = int(1e6)
-    config["n_episodes"] = 50000
-    config["episode_length"] = 25
+    config["n_episodes"] = 100000
+    config["episode_length"] = 3000
     config["steps_per_update"] = 100
     config["num_updates"] = 4
     config["batch_size"] = 1024
     config["save_interval"] = 1000
-    config["pol_hidden_dim"] = 128
-    config["critic_hidden_dim"] = 128
+    config["pol_hidden_dim"] = 256
+    config["critic_hidden_dim"] = 256
     config["attend_heads"] = 4
-    config["pi_lr"] = 0.001
-    config["q_lr"] = 0.001
-    config["tau"] = 0.001
-    config["gamma"] = 0.99
+    config["pi_lr"] = 0.000001
+    config["q_lr"] = 0.000001
+    config["tau"] = 0.000005
+    config["gamma"] = 0.999
     config["reward_scale"] = 100.0
     config["use_gpu"] = False
 
