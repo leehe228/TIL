@@ -37,6 +37,10 @@ start_train_episode = 100
 run_episode = 1000
 test_episode = 100
 
+epsilon_init = 0.6
+epsilon_min = 0.05
+epsilon_desc = (epsilon_init - epsilon_min) / run_episode
+
 print_interval = 1
 # save_interval = 1
 
@@ -173,6 +177,8 @@ class Agent:
             init_update_target_skill.append(self.target_critic_skill.trainable_var[idx].assign(self.critic_skill.trainable_var[idx]))
         self.sess_skill.run(init_update_target_skill)
 
+        self.epsilon = epsilon_init
+
         #if load_model == True:
         #    self.Saver.restore(self.sess, load_path)
 
@@ -180,7 +186,6 @@ class Agent:
     def get_action_moving(self, state):
         actions = self.sess_moving.run(self.actor_moving.action, feed_dict={self.actor_moving.state: [state]})
         return actions
-
 
     def get_action_skill(self, state):
         actions = self.sess_skill.run(self.actor_skill.action, feed_dict={self.actor_skill.state: [state]})
@@ -294,16 +299,30 @@ if __name__ == '__main__':
         while not done:
             step += 1
 
-            if step % 10 == 0:
-                action_moving_arr = agent.get_action_moving(obs)
-                action_moving = np.argmax(action_moving_arr) + 1
+            if random.random() < agent.epsilon:
+                while True:
+                    action_sample = env.action_space.sample()
+                    if action_sample != 0: break
 
-                next_obs, reward, done, info = env.step(action_moving)
+                if moving_action_size >= action_sample >= 1:
+                    action_moving = action_sample
+
+                else:
+                    action_skill = action_sample
+
+                next_obs, reward, done, info = env.step(action_sample)
+
             else:
-                action_skill_arr = agent.get_action_skill(obs)
-                action_skill = np.argmax(action_skill_arr) + 9
+                if step % 10 == 0:
+                    action_moving_arr = agent.get_action_moving(obs)
+                    action_moving = np.argmax(action_moving_arr) + 1
 
-                next_obs, reward, done, info = env.step(action_skill)
+                    next_obs, reward, done, info = env.step(action_moving)
+                else:
+                    action_skill_arr = agent.get_action_skill(obs)
+                    action_skill = np.argmax(action_skill_arr) + 9
+
+                    next_obs, reward, done, info = env.step(action_skill)
 
             print("s: {} | ep: {} | r: {:.3f} | a : {} | s : {} |               ".format(step, episode, episode_rewards, action_set[action_moving], action_set[action_skill]), end='\r')
 
@@ -323,5 +342,7 @@ if __name__ == '__main__':
             print("s: {} | ep: {} | r: {:.3f} |                                                  ".format(step, episode, episode_rewards))
             agent.Write_Summray(episode_rewards, episode)
         
+        if agent.epsilon > epsilon_min:
+            agent.epsilon -= epsilon_desc
 
     env.close()

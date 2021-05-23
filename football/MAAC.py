@@ -74,7 +74,11 @@ def run(config):
         obs = env.reset()
         model.prep_rollouts(device='cpu')
 
-        for et_i in range(config["episode_length"]):
+        done = [False]
+        et_i = 0
+
+        while not any(done):
+            et_i += 1
             # rearrange observations to be per agent, and convert to torch Variable
             torch_obs = [Variable(torch.Tensor(np.vstack(obs[:, i])),
                                   requires_grad=False)
@@ -93,9 +97,9 @@ def run(config):
                     temp.append(np.argmax(b))
                 actions_list.append(temp)
 
-            next_obs, rewards, dones, infos = env.step(actions_list)
+            next_obs, rewards, done, infos = env.step(actions_list)
 
-            dones = [dones for _ in range(11)]
+            dones = [done for _ in range(11)]
 
             replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
             obs = next_obs
@@ -113,6 +117,9 @@ def run(config):
                     model.update_policies(sample, logger=logger)
                     model.update_all_targets()
                 model.prep_rollouts(device='cpu')
+
+            print("ep_i : {} | et_i : {}".format(ep_i, et_i), end='\r')
+
         ep_rews = replay_buffer.get_average_rewards(
             config["episode_length"] * config["n_rollout_threads"])
         for a_i, a_ep_rew in enumerate(ep_rews):
@@ -136,7 +143,7 @@ if __name__ == '__main__':
 
     config["env_id"] = "football"
     config["model_name"] = "MAAC"
-    config["n_rollout_threads"] = 16
+    config["n_rollout_threads"] = 8
     config["buffer_length"] = int(1e6)
     config["n_episodes"] = 100000
     config["episode_length"] = 3000
