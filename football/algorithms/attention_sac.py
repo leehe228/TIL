@@ -93,8 +93,7 @@ class AttentionSAC(object):
         trgt_critic_in = list(zip(next_obs, next_acs))
         critic_in = list(zip(obs, acs))
         next_qs = self.target_critic(trgt_critic_in)
-        critic_rets = self.critic(critic_in, regularize=True,
-                                  logger=logger, niter=self.niter)
+        critic_rets = self.critic(critic_in, regularize=True, logger=logger, niter=self.niter)
         q_loss = 0
         for a_i, nq, log_pi, (pq, regs) in zip(range(self.nagents), next_qs,
                                                next_log_pis, critic_rets):
@@ -129,8 +128,7 @@ class AttentionSAC(object):
             curr_ac, probs, log_pi, pol_regs, ent = pi(
                 ob, return_all_probs=True, return_log_pi=True,
                 regularize=True, return_entropy=True)
-            logger.add_scalar('agent%i/policy_entropy' % a_i, ent,
-                              self.niter)
+            logger.add_scalar('agent%i/policy_entropy' % a_i, ent, self.niter)
             samp_acs.append(curr_ac)
             all_probs.append(probs)
             all_log_pis.append(log_pi)

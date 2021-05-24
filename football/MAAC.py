@@ -120,8 +120,8 @@ def run(config):
 
             print("ep_i : {} | et_i : {}".format(ep_i, et_i), end='\r')
 
-        ep_rews = replay_buffer.get_average_rewards(
-            config["episode_length"] * config["n_rollout_threads"])
+        ep_rews = replay_buffer.get_average_rewards(config["episode_length"] * config["n_rollout_threads"])
+        
         for a_i, a_ep_rew in enumerate(ep_rews):
             logger.add_scalar('agent%i/mean_episode_rewards' % a_i,
                               a_ep_rew * config["episode_length"], ep_i)
