@@ -1,5 +1,10 @@
+#-*-coding:utf-8-*-
+#!/usr/bin/env python3
+
 import gfootball.env as football_env
 from gym.spaces import Box, Discrete
+
+# disable logger casting warning
 import gym
 gym.logger.set_level(40)
 
@@ -20,6 +25,7 @@ from pathlib import Path
 def make_parallel_env(n_rollout_threads, seed):
     def get_env_fn(rank):
         def init_env():
+            # Google Football Env
             env = football_env.create_environment(
                 env_name=config["academy_scenario"],
                 rewards=config["scoring"],
@@ -34,6 +40,7 @@ def make_parallel_env(n_rollout_threads, seed):
         return DummyVecEnv([get_env_fn(0)])
     else:
         return SubprocVecEnv([get_env_fn(i) for i in range(n_rollout_threads)])
+
 
 def run(config):
     model_dir = Path('./models') / config["env_id"] / config["model_name"]
@@ -65,6 +72,7 @@ def run(config):
                                        critic_hidden_dim=config["critic_hidden_dim"],
                                        attend_heads=config["attend_heads"],
                                        reward_scale=config["reward_scale"])
+    # Set Replay Buffer 
     replay_buffer = ReplayBuffer(config["buffer_length"], model.nagents,
                                  [115 for _ in range(model.nagents)],
                                  [19 for _ in range(model.nagents)])
@@ -88,13 +96,16 @@ def run(config):
             # rearrange actions to be per environment
             actions = [[ac[i] for ac in agent_actions] for i in range(config["n_rollout_threads"])]
 
+            # Reform Actions list to fit on Football Env
             actions_list = [[np.argmax(b) for b in a] for a in actions]
 
+            # Step
             next_obs, rewards, dones, infos = env.step(actions_list)
 
             # Prevention of divergence
             rewards = rewards - 0.00001
 
+            # Reform Done Flag list
             dones = (np.array([dones for _ in range(model.nagents)])).T
 
             replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
@@ -151,6 +162,7 @@ if __name__ == '__main__':
     config["reward_scale"] = 100.0
     config["use_gpu"] = False
 
+    # Google Football Configure Flags
     config["academy_scenario"] = "11_vs_11_easy_stochastic"
     config["scoring"] = "scoring,checkpoints"
     config["render_mode"] = False
