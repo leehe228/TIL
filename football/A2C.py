@@ -22,20 +22,20 @@ num_to_control = 1
 academy_scenario = '11_vs_11_easy_stochastic'
 scoring = 'scoring,checkpoints'
 
-batch_size = 256
-mem_maxlen = 100000
-discount_factor = 0.999
-actor_lr = 0.000001
-critic_lr = 0.000005
-tau = 0.000003
+batch_size = 1024
+mem_maxlen = int(1e6)
+discount_factor = 0.9999
+actor_lr = 0.0000001
+critic_lr = 0.0000005
+tau = 0.0000005
 
 mu = 0
 theta = 0.000001
 sigma = 0.000003
 
-start_train_episode = 100
-run_episode = 50000
-test_episode = 100
+start_train_episode = 1000
+run_episode = 5000000
+test_episode = 1000
 
 epsilon_init = 0.6
 epsilon_min = 0.05
@@ -298,6 +298,8 @@ if __name__ == '__main__':
         action_skill_arr = agent.get_action_skill(obs)
         action_skill = np.argmax(action_skill_arr) + 9
 
+        step = 0
+
         while not done:
             step += 1
 
@@ -328,23 +330,7 @@ if __name__ == '__main__':
 
             print("s: {} | ep: {} | r: {:.3f} | a : {} | s : {} |               ".format(step, episode, episode_rewards, action_set[action_moving], action_set[action_skill]), end='\r')
 
-            # REWARD
-
-            # dont have a ball
-            if obs[94] == 1.0:
-                reward -= 0.00001
-                drib_time = 0.0
-
-            # have a ball
-            elif obs[95] == 1.0:
-                drib_time += 1
-                reward -= (drib_time * 0.000001)
-
-            if next_obs[95] == 1.0 and obs[95] == 0.0:
-                reward += 0.00001
-
-            if obs[96] == 1.0:
-                reward -= 0.00001
+            reward = reward - (0.00001 * 11) 
 
             episode_rewards += reward
             
