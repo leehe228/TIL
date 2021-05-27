@@ -242,11 +242,13 @@ class AttentionSAC(object):
         """
         agent_init_params = []
         sa_size = []
+        # (** EDITED **) Set In, Out dim Info directly
+        # Google Football Env와 Gym 환경의 space가 다름 (discrete & Box)
+        # 직접 action_space, observation_space의 shape 설정
         """for acsp, obsp in zip([env.action_space], [env.observation_space]):
             agent_init_params.append({'num_in_pol': obsp.shape[0],
                                       'num_out_pol': acsp.n})
             sa_size.append((obsp.shape[0], acsp.n))"""
-
         for _ in range(11):
             agent_init_params.append({'num_in_pol': 115, 'num_out_pol': 19})
             sa_size.append((115, 19))

@@ -27,6 +27,8 @@ def worker(remote, parent_remote, env_fn_wrapper):
             break
         elif cmd == 'get_spaces':
             remote.send((env.observation_space, env.action_space))
+        # (** EDITED **) Set Agent Type
+        # Google Football Env.agents 사용 불가 -> 직접 agent type 설정
         elif cmd == 'get_agent_types':
             """if all([hasattr(a, 'adversary') for a in env.agents]):
                 remote.send(['adversary' if a.adversary else 'agent' for a in
@@ -100,6 +102,8 @@ class DummyVecEnv(VecEnv):
         self.envs = [fn() for fn in env_fns]
         env = self.envs[0]        
         VecEnv.__init__(self, len(env_fns), env.observation_space, env.action_space)
+        # (** EDITED **) Set Agent Type
+        # Google Football Env.agents 사용 불가 -> 직접 agent type 설정
         """if all([hasattr(a, 'adversary') for a in env.agents]):
             self.agent_types = ['adversary' if a.adversary else 'agent' for a in
                                 env.agents]
