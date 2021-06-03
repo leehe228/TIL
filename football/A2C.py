@@ -214,8 +214,7 @@ class Agent:
                                                 feed_dict={self.target_critic_moving.state: next_states,
                                                 self.target_critic_moving.action: target_actor_actions_moving})
         target_qs_moving = np.asarray([reward + discount_factor * (1 - done) * target_critic_predict_q
-                                for reward, target_critic_predict_q, done in zip(
-                                                        rewards, target_critic_predict_qs_moving, dones)])
+                                for reward, target_critic_predict_q, done in zip(rewards, target_critic_predict_qs_moving, dones)])
         self.sess_moving.run(self.train_critic_moving, feed_dict={self.critic_moving.state: states,
                                                     self.critic_moving.action: actions,
                                                     self.target_q_moving: target_qs_moving})

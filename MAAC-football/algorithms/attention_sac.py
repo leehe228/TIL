@@ -249,9 +249,9 @@ class AttentionSAC(object):
             agent_init_params.append({'num_in_pol': obsp.shape[0],
                                       'num_out_pol': acsp.n})
             sa_size.append((obsp.shape[0], acsp.n))"""
-        for _ in range(11):
-            agent_init_params.append({'num_in_pol': 115, 'num_out_pol': 19})
-            sa_size.append((115, 19))
+        for _ in range(3):
+            agent_init_params.append({'num_in_pol': 40, 'num_out_pol': 19})
+            sa_size.append((40, 19))
 
         init_dict = {'gamma': gamma, 'tau': tau,
                      'pi_lr': pi_lr, 'q_lr': q_lr,
