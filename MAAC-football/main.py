@@ -19,6 +19,74 @@ import gym
 gym.logger.set_level(40)
 
 
+def make_state(obs):
+    state = []
+
+    for p in range(11):
+        o = obs[p]
+        tempList = []
+        # activate and designated
+        if o['active'] == p:
+            tempList.append(1)
+        else:
+            tempList.append(0)
+
+        if o['designated'] == p:
+            tempList.append(1)
+        else:
+            tempList.append(0)    
+
+        # home team
+        tempList.append(o['left_team_tired_factor'][p])
+        tempList.append(o['left_team'][p][0])
+        tempList.append(o['left_team'][p][1])
+
+        for l in range(len(o['left_team'])):
+            if l == p: continue
+            else:
+                tempList.append(o['left_team'][l][0])
+                tempList.append(o['left_team'][l][1])
+
+        tempList.append(o['left_team_direction'][p][0])
+        tempList.append(o['left_team_direction'][p][1])
+
+        for l in range(len(o['left_team_direction'])):
+            if l == p: continue
+            else:
+                tempList.append(o['left_team_direction'][l][0])
+                tempList.append(o['left_team_direction'][l][1])
+        
+        # side team
+        for r in o['right_team']:
+            tempList.append(r[0])
+            tempList.append(r[1])
+        for r in o['right_team_direction']:
+            tempList.append(r[0])
+            tempList.append(r[1])
+
+        # ball
+        tempList.append(o['ball'][0])
+        tempList.append(o['ball'][1])
+        tempList.append(o['ball'][2])
+        tempList.append(o['ball_rotation'][0])
+        tempList.append(o['ball_rotation'][1])
+        tempList.append(o['ball_rotation'][2])
+        tempList.append(o['ball_direction'][0])
+        tempList.append(o['ball_direction'][1])
+        tempList.append(o['ball_direction'][2])
+        tempList.append(o['ball_owned_team'])
+
+        # etc
+        tempList.append(o['score'][0])
+        tempList.append(o['score'][1])
+        tempList.append(o['game_mode'])
+
+        state.append(np.array(tempList))
+
+    state = np.array(state)
+    return state
+
+
 def make_parallel_env(n_rollout_threads, seed):
     def get_env_fn(rank):
         def init_env():
@@ -29,7 +97,7 @@ def make_parallel_env(n_rollout_threads, seed):
                 rewards=config["scoring"],
                 render=config["render_mode"],
                 number_of_left_players_agent_controls=config["num_to_control"],
-                representation='simple115v2')
+                representation='raw')
 
             env.seed(seed + rank * 1000)
             np.random.seed(seed + rank * 1000)
@@ -71,10 +139,11 @@ def run(config):
                                        critic_hidden_dim=config["critic_hidden_dim"],
                                        attend_heads=config["attend_heads"],
                                        reward_scale=config["reward_scale"])
+    #model = AttentionSAC.init_from_save("./models/football/MAAC3/run2/model.pt", True)
     # (** EDITED **) Set Replay Buffer
     # env.action_space, env.observation_space 의 shape를 iteration을 통해 버퍼 설정
     replay_buffer = ReplayBuffer(config["buffer_length"], model.nagents,
-                                 [115 for _ in range(model.nagents)],
+                                 [104 for _ in range(model.nagents)],
                                  [19 for _ in range(model.nagents)])
     t = 0
     for ep_i in range(0, config["n_episodes"], config["n_rollout_threads"]):
@@ -83,6 +152,7 @@ def run(config):
                                         config["n_episodes"]))
 
         obs = env.reset()
+        obs = np.array([make_state(o) for o in obs])
         model.prep_rollouts(device='cpu')
 
         for et_i in range(config["episode_length"]):
@@ -104,10 +174,11 @@ def run(config):
 
             # Step
             next_obs, rewards, dones, infos = env.step(actions_list)
-
+            next_obs = np.array([make_state(n_o) for n_o in next_obs])
+            
             # Prevention of divergence
             # 안해주면 발산해서 학습 불가 (NaN)
-            rewards = rewards - 0.00001
+            rewards = rewards - 0.000001
 
             # Reform Done Flag list
             # replay buffer에 알맞도록 done 리스트 재구성
@@ -151,27 +222,27 @@ if __name__ == '__main__':
     config = dict()
 
     config["env_id"] = "football"
-    config["model_name"] = "MAAC"
-    config["n_rollout_threads"] = 4
+    config["model_name"] = "MAAC11"
+    config["n_rollout_threads"] = 2
     config["buffer_length"] = int(1e6)
-    config["n_episodes"] = 5000000
-    config["episode_length"] = 3000
+    config["n_episodes"] = 100000000
+    config["episode_length"] = 400
     config["steps_per_update"] = 100
     config["num_updates"] = 4
-    config["batch_size"] = 1024
-    config["save_interval"] = 30000
-    config["pol_hidden_dim"] = 512
-    config["critic_hidden_dim"] = 512
+    config["batch_size"] = 4096
+    config["save_interval"] = 1000
+    config["pol_hidden_dim"] = 128
+    config["critic_hidden_dim"] = 128
     config["attend_heads"] = 4
-    config["pi_lr"] = 0.0000001
-    config["q_lr"] = 0.0000001
-    config["tau"] = 0.0000005
-    config["gamma"] = 0.9999
+    config["pi_lr"] = 0.001
+    config["q_lr"] = 0.001
+    config["tau"] = 0.001
+    config["gamma"] = 0.99
     config["reward_scale"] = 100.0
-    config["use_gpu"] = False
+    config["use_gpu"] = True
 
     # Google Football Configure Flags
-    config["academy_scenario"] = "11_vs_11_easy_stochastic"
+    config["academy_scenario"] = "academy_single_goal_versus_lazy"
     config["scoring"] = "scoring,checkpoints"
     config["render_mode"] = False
     config["num_to_control"] = 11
